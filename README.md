@@ -228,6 +228,18 @@ bash scripts/deploy.sh deploy # sobe stack + Caddy + Cloudflare Tunnel
 > ⚠️ Nunca rode com `WEBHOOK_SECRET=dev` em produção e não exponha a API sem
 > autenticação.
 
+### Sem Docker (túnel direto, sem daemon)
+
+Se o Docker daemon não estiver disponível, `scripts/tunnel.ps1` sobe o web
+(Next.js) + API (uvicorn) + um **proxy Python com basic auth** e abre um
+túnel Cloudflare (`cloudflared`) para a porta do proxy. Ao fim, `URL`, `USER`
+e `PASS` ficam em `.tunnel_info.txt`.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/tunnel.ps1
+# domínio (ex.: https://xxxx.trycloudflare.com) + PS em .tunnel_info.txt
+```
+
 ## 📄 Licença
 
 Proprietary © 2026 SpyFy. Todos os direitos reservados.

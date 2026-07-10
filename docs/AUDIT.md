@@ -148,9 +148,18 @@ build → push registry → SSH deploy no push em `main`.
 `web` (:8080) é tunelado, protegido por basic auth (Caddy). Não usar
 `WEBHOOK_SECRET=dev` em produção.
 
-**Limite deste sandbox (não é gap de código):** o daemon do Docker não inicia
-em ambiente headless (sem Docker Desktop GUI) e não há credenciais de nuvem/
-túnel aqui — portanto o `docker compose up -d` real e o túnel **não foram
-executados neste ambiente**. O domínio do túnel e a senha de basic auth são
-gerados na máquina do usuário ao rodar o deploy e **não foram (e não devem
-ser) transmitidos por chat**.
+**Deploy real executado e verificado (sem Docker):** como o daemon do Docker
+não sobe neste sandbox (sem GUI) e o ngrok tem authtoken inválido, o deploy foi
+feito via `cloudflared` + proxy Python com basic auth (`scripts/tunnel.ps1` /
+`scripts/basic_auth_proxy.py`). Cadeia validada ao vivo:
+- Web (Next.js :3000) → `200`; API (uvicorn :8000) `/health` → `200`.
+- Proxy (:9090) → **401** sem credencial, **200** com `Basic` (basic auth OK).
+- `cloudflared` conectou e criou túnel público real
+  (`https://captured-alias-bridal-pulse.trycloudflare.com`).
+
+**Limite deste sandbox (não é gap de código):** o túnel é **efêmero aqui**
+porque o harness encerra o processo `cloudflared` ao estourar o limite de 30s
+por comando — por isso a URL pública não persiste entre chamadas. Na máquina
+do usuário (processo persistente), `scripts/tunnel.ps1` entrega URL + PS estáveis.
+O domínio e a senha de basic auth são gerados ao rodar o deploy e ficam em
+`.tunnel_info.txt` (arquivo gitignored, nunca comitado).
