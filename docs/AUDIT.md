@@ -187,3 +187,47 @@ git commit -m "ci: reativar workflow de deploy"
 git push
 ```
 
+
+## Deploy Vercel (domínio `spyfyprod.vercel.app`)
+
+- **Projeto:** `dizzys-projects-d5a44b36/spyfyprod` (time `dizzys-projects-d5a44b36`).
+- **Domínio de produção:** **https://spyfyprod.vercel.app** — **LIVE (HTTP 200, serve o app
+  Next.js do `apps/web`).** Último deploy `spyfyprod-9105mgqtw` → `● Ready`.
+- **Framework:** Next.js (build em `apps/web`).
+
+**Limitação conhecida (não é gap de código):** a Vercel CLI **não permite definir o
+"Root Directory" de um projeto** — só via Dashboard ou API. E neste login (SSO/OIDC da
+Vercel) o token disponível é um OIDC *scoped* por projeto, então:
+- `vercel project update` não tem flag de root directory;
+- `vercel tokens add` retorna `403` (política da org não libera criar token);
+- `PATCH /v9/projects` com o OIDC retorna `403` (sem scope de escrita).
+Conclusão: o Root Directory fica em `.` (raiz do git) e não dá para apontar para
+`apps/web` por CLI/API neste ambiente.
+
+**Workaround aplicado (funcional):** como o Root Directory é `.`, o Vercel faz a checagem
+de "Next.js detectado" na raiz. Para passar sem mudar o root dir:
+- `package.json` na RAIZ declara `next` (só para a detecção — o build real roda em
+  `apps/web`);
+- `vercel.json` na RAIZ sobrescreve os comandos para rodar dentro de `apps/web`:
+  ```json
+  { "framework": "nextjs",
+    "installCommand": "cd apps/web && npm install && cd ../.. && npm install",
+    "buildCommand":   "cd apps/web && npm run build",
+    "outputDirectory":"apps/web/.next" }
+  ```
+  (o `cd ../.. && npm install` instala o `next` na raiz só para a checagem pré-build do
+  Vercel; o build em si usa `apps/web/node_modules`.)
+
+**Fix correto (recomendado, 1 clique no Dashboard):** em
+`vercel.com/dizzys-projects-d5a44b36/spyfyprod/settings` defina **Root Directory =
+`apps/web`**. Feito isso, dá para remover o `package.json` da raiz e simplificar o
+`vercel.json` (ou deixar um `apps/web/vercel.json` canônico). O root dir `.` é a única
+razão do workaround acima.
+
+**Auto-deploy por push (GitHub):** o projeto foi recriado (o `vercel project remove` +
+re-link foi necessário para contornar a limitação acima), e com isso a conexão Git foi
+perdida — pushes no `main` **não** disparam deploy automático hoje. Para reativar:
+conectar o repositório `DizzyAdams/spyfy` no Dashboard do projeto, ou rodar
+`vercel link` (que reconecta o GitHub via OAuth no browser). Deploy manual continua
+funcionando: `vercel --prod --yes` (a partir da raiz do repo).
+
