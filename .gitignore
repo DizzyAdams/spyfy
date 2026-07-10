@@ -27,6 +27,7 @@ Thumbs.db
 
 # Logs
 *.log
+*.err
 
 # Deploy tunnel artifacts (senha/ephemeral — nunca comitar)
 .tunnel_ps.txt
