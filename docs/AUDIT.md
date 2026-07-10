@@ -163,3 +163,27 @@ por comando — por isso a URL pública não persiste entre chamadas. Na máquin
 do usuário (processo persistente), `scripts/tunnel.ps1` entrega URL + PS estáveis.
 O domínio e a senha de basic auth são gerados ao rodar o deploy e ficam em
 `.tunnel_info.txt` (arquivo gitignored, nunca comitado).
+
+## Repositório (GitHub)
+
+- **URL:** https://github.com/DizzyAdams/spyfy
+- **Visibilidade:** `PUBLIC` (acesso de leitura livre — "permissão total").
+- **Branch default:** `main` (renomeado de `master`).
+- **Conteúdo versionado:** código (`apps/web`, `apps/workers-py`), deploy scripts
+  (`scripts/`), docs e `.env.example`. Nada de segredos reais (`.env`,
+  `.tunnel_*`, `*.err`, `*.log` estão no `.gitignore`).
+
+**CI (GitHub Actions) temporariamente desabilitado:** o workflow
+`.github/workflows/deploy.yml` foi renomeado para `deploy.yml.disabled`
+porque o token do `gh` neste ambiente **não tem o scope `workflow`** — o
+GitHub recusa o push de arquivos de workflow sem esse scope. O arquivo
+permanece no repo para reativar quando quiser:
+
+```powershell
+# na sua máquina (precisa de browser p/ consentir o scope):
+gh auth refresh -s workflow
+git mv .github/workflows/deploy.yml.disabled .github/workflows/deploy.yml
+git commit -m "ci: reativar workflow de deploy"
+git push
+```
+
