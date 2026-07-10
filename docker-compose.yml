@@ -1,0 +1,29 @@
+# SpyFy — orquestração local (docker compose up -d)
+# Sobe Web (Next.js :3000) + API (FastAPI :8000).
+# Workers de scraping (Loops 2/3) entram quando os clientes A2/A3 forem implementados.
+
+services:
+  web:
+    build: ./apps/web
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    build: ./apps/workers-py
+    ports:
+      - "8000:8000"
+    environment:
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-dev}
+      - NOVU_API_KEY=${NOVU_API_KEY:-}
+      - NTFY_URL=${NTFY_URL:-https://ntfy.spyfy.io}
+    healthcheck:
+      test:
+        ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

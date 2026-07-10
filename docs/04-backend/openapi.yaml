@@ -1,0 +1,186 @@
+openapi: 3.1.0
+info:
+  title: SpyFy API
+  version: "1.0.0"
+  description: >
+    API pública do SpyFy — Ad Intelligence & Offer Cloning.
+    Descoberta, clonagem em tempo real, coleções, alertas, analytics,
+    marketplace e copilot.
+servers:
+  - url: https://api.spyfy.io/v1
+    description: Produção
+  - url: https://sandbox.api.spyfy.io/v1
+    description: Sandbox
+security:
+  - bearerAuth: []
+tags:
+  - name: Offers
+  - name: Clones
+  - name: Collections
+  - name: Alerts
+  - name: Analytics
+  - name: Marketplace
+  - name: Copilot
+paths:
+  /offers/search:
+    get:
+      tags: [Offers]
+      summary: Busca de ofertas
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: network, in: query, schema: { type: string, enum: [meta, tiktok, google, native] } }
+        - { name: country, in: query, schema: { type: string } }
+        - { name: min_days, in: query, schema: { type: integer } }
+        - { name: sort, in: query, schema: { type: string, enum: [score, recent, longevity] } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 25 } }
+      responses:
+        "200":
+          description: Resultados
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OfferSearchResponse" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /offers/{id}:
+    get:
+      tags: [Offers]
+      summary: Detalhe da oferta
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Oferta
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Offer" }
+  /clones:
+    post:
+      tags: [Clones]
+      summary: Inicia clonagem
+      parameters:
+        - { name: Idempotency-Key, in: header, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { offer_id: { type: string } }
+              required: [offer_id]
+      responses:
+        "202":
+          description: Clonagem iniciada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Clone" }
+  /clones/{id}:
+    get:
+      tags: [Clones]
+      summary: Status/resultado da clonagem
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Clone
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Clone" }
+  /clones/{id}/stream:
+    get:
+      tags: [Clones]
+      summary: Stream (SSE) do progresso da clonagem em tempo real
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: text/event-stream de eventos (lp_fetched, assets_saved, ...)
+  /collections:
+    get: { tags: [Collections], summary: Lista coleções, responses: { "200": { description: OK } } }
+    post: { tags: [Collections], summary: Cria coleção, responses: { "201": { description: Criada } } }
+  /alerts:
+    get: { tags: [Alerts], summary: Lista alertas, responses: { "200": { description: OK } } }
+    post: { tags: [Alerts], summary: Cria alerta, responses: { "201": { description: Criado } } }
+  /analytics/niches/{niche}/overview:
+    get:
+      tags: [Analytics]
+      summary: Overview de nicho
+      parameters:
+        - { name: niche, in: path, required: true, schema: { type: string } }
+      responses: { "200": { description: OK } }
+  /marketplace/listings:
+    get: { tags: [Marketplace], summary: Lista listings, responses: { "200": { description: OK } } }
+    post: { tags: [Marketplace], summary: Publica listing, responses: { "201": { description: Criado } } }
+  /copilot/messages:
+    post:
+      tags: [Copilot]
+      summary: Envia mensagem ao Copilot (streaming)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { message: { type: string }, thread_id: { type: string } }
+              required: [message]
+      responses:
+        "200": { description: Stream de tokens + ações }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  responses:
+    RateLimited:
+      description: Too Many Requests
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            request_id: { type: string }
+    Offer:
+      type: object
+      properties:
+        offer_id: { type: string }
+        headline: { type: string }
+        network: { type: string }
+        niche: { type: string }
+        longevity_days: { type: integer }
+        winning_score: { type: number }
+        creative:
+          type: object
+          properties:
+            type: { type: string }
+            thumbnail: { type: string }
+        advertiser:
+          type: object
+          properties:
+            name: { type: string }
+            page_url: { type: string }
+    OfferSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/Offer" }
+        next_cursor: { type: string }
+    Clone:
+      type: object
+      properties:
+        clone_id: { type: string }
+        status: { type: string, enum: [queued, running, completed, failed] }
+        download_url: { type: string }
+        funnel_steps:
+          type: array
+          items:
+            type: object
+            properties:
+              order: { type: integer }
+              type: { type: string }
+              url: { type: string }
+
