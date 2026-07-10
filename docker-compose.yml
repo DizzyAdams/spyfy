@@ -27,3 +27,38 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+  # Proxy com basic auth a frente do web (protege exposicao publica via tunnel)
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./scripts/gen-caddyfile.sh:/gen-caddyfile.sh:ro
+    environment:
+      - BASIC_AUTH_USER=${BASIC_AUTH_USER:-spyfy}
+      - BASIC_AUTH_PASSWORD=${BASIC_AUTH_PASSWORD:-change-me-please}
+    command: ["/bin/sh", "/gen-caddyfile.sh"]
+    depends_on:
+      web:
+        condition: service_started
+
+  # Tunnel publico (Cloudflare) -> caddy:8080
+  tunnel-cloudflare:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    environment:
+      - CLOUDFLARE_TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - caddy
+    profiles: ["tunnel"]
+
+  # Tunnel publico (ngrok) -> caddy:8080
+  tunnel-ngrok:
+    image: ngrok/ngrok:latest
+    command: http caddy:8080
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    depends_on:
+      - caddy
+    profiles: ["tunnel"]

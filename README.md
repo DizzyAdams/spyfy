@@ -206,6 +206,28 @@ Ver detalhes em [tech-stack.md](docs/01-architecture/tech-stack.md).
 
 ---
 
+## 🚀 Deploy & Cloud Tunnel (automático)
+
+O stack sobe com `docker compose` e pode ser exposto publicamente via túnel
+(ngrok ou Cloudflare Tunnel) com **basic auth na frente** (Caddy), para não
+deixar a API sem autenticação exposta na internet.
+
+```bash
+cp .env.example .env          # preencha WEBHOOK_SECRET, BASIC_AUTH_PASSWORD, tokens
+bash scripts/deploy.sh deploy # sobe stack + Caddy + Cloudflare Tunnel
+```
+
+- O **domínio** do túnel é impresso pelo próprio ngrok/cloudflared ao subir
+  (ex.: `https://<random>.ngrok-free.app` ou seu domínio fixo na Cloudflare).
+- A **senha (PS)** é a `BASIC_AUTH_PASSWORD` que você definiu no `.env` — ela
+  **não é enviada por chat**; fica só no seu `.env` (ou secret do CI).
+- A `api` (:8000) fica **interna**; só o `web` (:8080 via Caddy) é tunelado.
+- CI automatizado em `.github/workflows/deploy.yml` (build → push registry →
+  SSH deploy). Configure os secrets do repo para ativar.
+
+> ⚠️ Nunca rode com `WEBHOOK_SECRET=dev` em produção e não exponha a API sem
+> autenticação.
+
 ## 📄 Licença
 
 Proprietary © 2026 SpyFy. Todos os direitos reservados.

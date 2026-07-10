@@ -122,20 +122,35 @@ PYTHONPATH=. pytest -q                                              # 94 testes
 4. Teste de carga (k6) nos endpoints.
 5. Revisão de integração NexusTracker + DarkfyCheckout (contratos reais).
 
-## Status de Deploy (deploy-ready)
+## Status de Deploy (deploy-ready + automação)
 
 Artefatos de deploy criados e validados:
 
 | Artefato | Estado |
 |----------|--------|
-| `docker-compose.yml` (web + api) | ✅ validado via `docker compose config` |
+| `docker-compose.yml` (web + api + caddy + tunnel) | ✅ validado via `docker compose config` |
 | `apps/web/Dockerfile` + `.dockerignore` | ✅ (Next.js 15, `next start` :3000) |
-| `apps/workers-py/.dockerignore` | ✅ (imagem da API já existia) |
-| Build do frontend (`next build`) | ✅ 13 rotas geradas localmente |
-| API FastAPI serve | ✅ smoke test (TestClient): `/health`, `/v1/version`, `/v1/events/types`, `/v1/offers/estimate` → 200 |
-| Repositório git | ✅ `git init` + commit inicial (157 arquivos) |
+| `apps/workers-py/.dockerignore` | ✅ |
+| `scripts/deploy.sh` (up/down/ngrok/tunnel/deploy) | ✅ criado |
+| `scripts/gen-caddyfile.sh` (basic auth env-driven) | ✅ criado |
+| `.env.example` (template de secrets) | ✅ criado |
+| `.github/workflows/deploy.yml` (CI automatizado) | ✅ criado (template) |
+| Build do frontend (`next build`) | ✅ 13 rotas |
+| API FastAPI serve | ✅ smoke test (TestClient) → 200 |
+| Basic auth (Caddy) à frente do túnel | ✅ configurado |
+| Repositório git | ✅ commit inicial + doc |
 
-**Passo final (manual, fora deste sandbox):** com o Docker daemon ativo,
-`docker compose up -d` sobe `web` (:3000) e `api` (:8000). Não foi possível
-executar o build/run dos containers aqui porque o daemon do Docker não inicia
-em ambiente headless (sem Docker Desktop GUI) — não é gap de código.
+**Automação de deploy:** `bash scripts/deploy.sh deploy` sobe stack + Caddy
+(basic auth) + Cloudflare Tunnel. CI em `.github/workflows/deploy.yml` faz
+build → push registry → SSH deploy no push em `main`.
+
+**Segurança ao expor publicamente:** a `api` (:8000) fica **interna**; só o
+`web` (:8080) é tunelado, protegido por basic auth (Caddy). Não usar
+`WEBHOOK_SECRET=dev` em produção.
+
+**Limite deste sandbox (não é gap de código):** o daemon do Docker não inicia
+em ambiente headless (sem Docker Desktop GUI) e não há credenciais de nuvem/
+túnel aqui — portanto o `docker compose up -d` real e o túnel **não foram
+executados neste ambiente**. O domínio do túnel e a senha de basic auth são
+gerados na máquina do usuário ao rodar o deploy e **não foram (e não devem
+ser) transmitidos por chat**.
