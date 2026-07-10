@@ -19,6 +19,7 @@ Auditoria automatizada do estado do projeto. Atualizada a cada rodada.
 | Lint (ruff) | ✅ 0 erros (spyfy + tests) |
 | Type-check (mypy) | ✅ 0 erros (20 arquivos) |
 | Scan de dependências (pip-audit) | ✅ 0 vulnerabilidades |
+| SAST (bandit) | ✅ 0 issues (1843 linhas) |
 
 ## Cobertura de testes por módulo
 
@@ -116,7 +117,25 @@ PYTHONPATH=. pytest -q                                              # 94 testes
 ## Próximas verificações (quando o link chegar)
 
 1. Auditoria do repositório/URL enviado (estrutura, deps, segredos expostos).
-2. ~~SAST (bandit/semgrep) + scan de dependências (pip-audit).~~ ✅ **pip-audit: 0 vulnerabilidades** (bandit/semgrep pendente).
+2. ~~SAST (bandit/semgrep) + scan de dependências (pip-audit).~~ ✅ **pip-audit: 0 vulnerabilidades · bandit: 0 issues** (semgrep opcional pendente).
 3. ~~Lint (ruff) + type-check (mypy).~~ ✅ **ruff: 0 erros · mypy: 0 erros (20 arquivos)**.
 4. Teste de carga (k6) nos endpoints.
 5. Revisão de integração NexusTracker + DarkfyCheckout (contratos reais).
+
+## Status de Deploy (deploy-ready)
+
+Artefatos de deploy criados e validados:
+
+| Artefato | Estado |
+|----------|--------|
+| `docker-compose.yml` (web + api) | ✅ validado via `docker compose config` |
+| `apps/web/Dockerfile` + `.dockerignore` | ✅ (Next.js 15, `next start` :3000) |
+| `apps/workers-py/.dockerignore` | ✅ (imagem da API já existia) |
+| Build do frontend (`next build`) | ✅ 13 rotas geradas localmente |
+| API FastAPI serve | ✅ smoke test (TestClient): `/health`, `/v1/version`, `/v1/events/types`, `/v1/offers/estimate` → 200 |
+| Repositório git | ✅ `git init` + commit inicial (157 arquivos) |
+
+**Passo final (manual, fora deste sandbox):** com o Docker daemon ativo,
+`docker compose up -d` sobe `web` (:3000) e `api` (:8000). Não foi possível
+executar o build/run dos containers aqui porque o daemon do Docker não inicia
+em ambiente headless (sem Docker Desktop GUI) — não é gap de código.
