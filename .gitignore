@@ -32,3 +32,6 @@ Thumbs.db
 # Deploy tunnel artifacts (senha/ephemeral — nunca comitar)
 .tunnel_ps.txt
 .tunnel_info.txt
+
+# Vercel link local (nao comitar)
+.vercel/
