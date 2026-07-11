@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Logo from "./illustrations/Logo";
+import { BackendStatus } from "./BackendStatus";
 
 const cols = [
   {
@@ -45,6 +46,7 @@ export function Footer() {
             <span className="chip">LGPD-ready</span>
             <span className="chip">99.9% uptime</span>
           </div>
+          <BackendStatus className="mt-4" />
         </div>
         {cols.map((c) => (
           <div key={c.title}>

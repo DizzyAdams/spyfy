@@ -16,6 +16,7 @@ import os
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 
 from .. import __version__
 from ..events import EVENT_TYPES, DomainEvent, EventBus
@@ -44,6 +45,18 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
     dedup = DedupStore()
     app.state.bus = bus
     app.state.dispatcher = dispatcher
+
+    # CORS: permite que o frontend (Vercel em produção + localhost em dev)
+    # chame a API a partir do navegador. Origens configuráveis via CORS_ORIGINS.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=os.getenv(
+            "CORS_ORIGINS",
+            "https://spyfyprod.vercel.app,http://localhost:3000,http://localhost:8080",
+        ).split(","),
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.get("/health", response_model=Health)
     def health() -> Health:

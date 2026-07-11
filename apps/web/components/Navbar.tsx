@@ -8,6 +8,7 @@ import { ArrowRight, Menu, X } from "lucide-react";
 import { magnetic, EXPOCSS } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import Logo from "./illustrations/Logo";
+import { BackendStatus } from "./BackendStatus";
 
 const links = [
   { href: "/#recursos", label: "Funcionalidades" },
@@ -156,6 +157,8 @@ export function Navbar() {
             </Link>
           </Magnetic>
         </div>
+
+        <BackendStatus className="hidden md:inline-flex" />
 
         {/* Mobile toggle */}
         <button
