@@ -27,7 +27,7 @@ export function BackendStatus({ className }: { className?: string }) {
       return;
     }
     let alive = true;
-    void (async () => {
+    const probe = async () => {
       const [health, ver] = await Promise.all([getHealth(), getVersion()]);
       if (!alive) return;
       if (health && health.status === "ok") {
@@ -36,9 +36,13 @@ export function BackendStatus({ className }: { className?: string }) {
       } else {
         setState("offline");
       }
-    })();
+    };
+    void probe();
+    // Polling ao vivo: reflete online/offline em tempo real (UX "perfeito").
+    const t = setInterval(() => void probe(), 20000);
     return () => {
       alive = false;
+      clearInterval(t);
     };
   }, []);
 

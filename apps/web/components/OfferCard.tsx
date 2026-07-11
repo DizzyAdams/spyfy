@@ -164,10 +164,34 @@ export function OfferCard({
                 transition={{ duration: 0.5, ease: EXPOCSS, delay: 0.15 }}
               >
                 <Gauge size={12} aria-hidden />
-                Escala {scale}
+                {offer.scalingSignal
+                  ? offer.scalingSignal === "hot"
+                    ? "🔥 Hot"
+                    : offer.scalingSignal === "scaling"
+                      ? "📈 Escalando"
+                      : offer.scalingSignal === "warming"
+                        ? "🌡️ Aquecendo"
+                        : "❄️ Fria"
+                  : `Escala ${scale}`}
               </motion.span>
+              {offer.estRoiPct !== undefined && (
+                <span
+                  className="chip"
+                  style={{
+                    color: "var(--success)",
+                    borderColor: "rgba(34, 197, 94, 0.35)",
+                    background: "rgba(34, 197, 94, 0.12)",
+                  }}
+                  title={`ROI estimado ${offer.estRoiPct}% · win-prob ${(offer.winProb ?? 0) * 100 | 0}%`}
+                >
+                  <TrendingUp size={12} aria-hidden />
+                  ROI {offer.estRoiPct}%
+                </span>
+              )}
               <span className="font-mono text-[11px] text-faint tabular-nums">
-                ~R${formatNumber(spend.daily)}/dia · {spend.label}
+                {offer.estDailySpend !== undefined
+                  ? `~R${formatNumber(offer.estDailySpend)}/dia`
+                  : `~R${formatNumber(spend.daily)}/dia · ${spend.label}`}
               </span>
             </div>
           </div>

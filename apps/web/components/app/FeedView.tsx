@@ -2,12 +2,13 @@
 
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { SlidersHorizontal, Activity, Users, Layers, WifiOff, Search, X } from "lucide-react";
+import { SlidersHorizontal, Activity, Users, Layers, WifiOff, Search, X, Server } from "lucide-react";
 import { NETWORKS, type Network, type Offer } from "@/lib/data";
 import { OfferCard } from "../OfferCard";
 import { LiveBadge } from "./LiveBadge";
 import { cn } from "@/lib/utils";
 import { useRealtime } from "@/lib/realtime/RealtimeProvider";
+import { getOffers, isApiConfigured } from "@/lib/api";
 
 const niches = [
   "Todos",
@@ -138,6 +139,28 @@ export function FeedView() {
   const [sort, setSort] = useState<"score" | "longevity">("score");
   const reduce = useReducedMotion();
 
+  // Ofertas REAIS vindo do backend (/v1/offers) — as melhores / mais
+  // escaladas das Ad Libraries, enriquecidas com ROI/win-prob. O feed
+  // mescla essas com o stream de realtime (offline-safe: se a API não
+  // estiver configurada, o feed fica só com o realtime/cache).
+  const [apiOffers, setApiOffers] = useState<Offer[]>([]);
+  const [apiReady, setApiReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    if (!isApiConfigured()) return;
+    getOffers({ limit: 120, simulate: true })
+      .then((res) => {
+        if (alive && res && res.offers.length) {
+          setApiOffers(res.offers);
+          setApiReady(true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // First-load skeletons show only during the initial connecting phase (before
   // the realtime layer confirms a live feed or goes offline).
   const showSkeletons = status === "connecting" && !loadedOnce;
@@ -149,11 +172,24 @@ export function FeedView() {
     else setFilters(filters);
   }, [query, search, setFilters, filters]);
 
-  // The 4 most recent offers drive the rotating live signal (offers[0] is newest).
-  const recent = useMemo(() => offers.slice(0, 4), [offers]);
+  // Base exibida = ofertas da API (reais, ranqueadas) mescladas com o
+  // realtime, dedup por id e ordenadas por winning score.
+  const base = useMemo<Offer[]>(() => {
+    if (!apiOffers.length) return offers;
+    const byId = new Map<string, Offer>();
+    for (const o of [...apiOffers, ...offers]) {
+      const prev = byId.get(o.id);
+      // prioriza a oferta da API, mas mantém a mais recente do realtime
+      byId.set(o.id, prev && prev.source !== "library" ? prev : o);
+    }
+    return [...byId.values()].sort((a, b) => b.winningScore - a.winningScore);
+  }, [apiOffers, offers]);
+
+  // The 4 most recent offers drive the rotating live signal (base[0] is newest).
+  const recent = useMemo(() => base.slice(0, 4), [base]);
 
   const results = useMemo(() => {
-    let r = offers.filter((o) =>
+    let r = base.filter((o) =>
       filters.network === "all" ? true : o.network === filters.network
     );
     r = r.filter((o) => (filters.niche === "Todos" ? true : o.niche === filters.niche));
@@ -185,18 +221,37 @@ export function FeedView() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Discovery Feed</h1>
           <p className="mt-1 text-sm text-muted">
-            {results.length} ofertas · Radar{" "}
-            <span className="text-text">em tempo real</span> · ordenadas por{" "}
+            {results.length} ofertas ·{" "}
+            {apiReady ? (
+              <span className="text-text">Ad Libraries ao vivo</span>
+            ) : (
+              <span className="text-text">Radar em tempo real</span>
+            )}{" "}
+            · ordenadas por{" "}
             <span className="text-text">
               {sort === "score" ? "winning score" : "longevidade"}
             </span>
           </p>
         </div>
-        <LiveBadge
-          status={status}
-          perMin={stats?.perMin}
-          uptimeSec={stats?.uptimeSec}
-        />
+        <div className="flex items-center gap-2">
+          {isApiConfigured() && (
+            <span
+              className={cn(
+                "chip",
+                apiReady ? "!text-[var(--success)]" : "!text-[var(--muted)]",
+              )}
+              title="Backend SpyFy (FastAPI) — ofertas reais das Ad Libraries"
+            >
+              <Server size={13} />
+              {apiReady ? `API · ${apiOffers.length}` : "API…"}
+            </span>
+          )}
+          <LiveBadge
+            status={status}
+            perMin={stats?.perMin}
+            uptimeSec={stats?.uptimeSec}
+          />
+        </div>
       </div>
 
       {/* Live stats + ticker */}

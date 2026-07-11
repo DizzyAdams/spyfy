@@ -1,0 +1,29 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Render (https://render.com) — SpyFy FastAPI backend (FREE TIER)
+# -----------------------------------------------------------------------------
+# Como usar (sem cartão, free tier de 512MB):
+#   1. No Render Dashboard -> "New" -> "Web Service" -> conecte este repo GitHub.
+#   2. Render detecta este arquivo e usa o Dockerfile em apps/workers-py.
+#   3. Defina WEBHOOK_SECRET (secret forte) e NTFY_URL nas env vars.
+#   4. Deploy automático a cada push na branch principal.
+# Free tier: dorme após 15min ocioso (cold start ~30-60s); RAG em memória zera no restart.
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  - type: web
+    name: spyfy-api
+    runtime: docker
+    dockerfilePath: ./apps/workers-py/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: WEBHOOK_SECRET
+        sync: false # ⚠️ defina um segredo forte no dashboard (nunca 'dev' em prod)
+      - key: NTFY_URL
+        value: "https://ntfy.sh/spyfy"
+      - key: CORS_ORIGINS
+        value: "https://spyfyprod.vercel.app,http://localhost:3000,http://localhost:8080"

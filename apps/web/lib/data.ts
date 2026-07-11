@@ -25,6 +25,25 @@ export interface Offer {
   scaleIndex?: number;
   /** Derivado (opcional) — gasto diário estimado em BRL; o cliente recalcula via spendBand(). */
   spendPerDay?: number;
+  // --- Campos vindos do backend (/v1/offers) — enriquecimento real ---
+  /** Sinal de escala calculado no backend (roi._scaling_signal). */
+  scalingSignal?: string;
+  /** ROI % estimado (backend). */
+  estRoiPct?: number;
+  /** ROAS estimado (backend). */
+  estRoas?: number;
+  /** Probabilidade de vencer (radar.win_probability, 0–1). */
+  winProb?: number;
+  /** Lucro diário estimado (BRL, backend). */
+  estDailyProfit?: number;
+  /** Gasto diário estimado (BRL, backend, mais preciso que spendPerDay). */
+  estDailySpend?: number;
+  /** Receita diária estimada (BRL, backend). */
+  estDailyRevenue?: number;
+  /** Confiança da estimativa (0–1). */
+  confidence?: number;
+  /** Origem ("library" quando minerado das Ad Libraries). */
+  source?: string;
 }
 
 export const NETWORKS: { key: Network; label: string; color: string }[] = [

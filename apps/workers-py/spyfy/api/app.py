@@ -18,11 +18,12 @@ from __future__ import annotations
 import os
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from .. import __version__
 from ..agents import MEMBERS, OfferMemory, run_offer_pipeline
+from ..offers_service import compute_metrics, discover_offers, get_offer_by_id
 from ..events import EVENT_TYPES, DomainEvent, EventBus
 from ..notifications import (Channel, Notification, NotificationPrefs, Priority)
 from ..notifiers import (AppriseAdapter, NotificationDispatcher, NovuAdapter,
@@ -170,6 +171,59 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
     def rag_count() -> dict:
         """Nº de ofertas indexadas na memória RAG (long-term memory)."""
         return {"count": app.state.memory.count()}
+
+    @app.get("/v1/offers")
+    def list_offers(
+        niche: str | None = Query(default=None, description="Rótulo de nicho (PT)"),
+        network: str | None = Query(default=None, description="meta|tiktok|google|…|all"),
+        country: str = Query(default="BR"),
+        limit: int = Query(default=24, ge=1, le=100),
+        simulate: bool = Query(
+            default=True,
+            description="True=fallback estruturado offline; False=tenta Ad Library real (precisa token)",
+        ),
+        token: str = Query(default="", description="Token da Ad Library (Meta) quando simulate=false"),
+    ) -> dict:
+        """Melhores / mais escaladas ofertas das Ad Libraries.
+
+        Minera as redes (Meta/Google/TikTok reais quando há token, com
+        fallback estruturado offline) e enriquece cada oferta com escala,
+        ROI e win-probability, ranqueando por ``winningScore``.
+        """
+        offers = discover_offers(
+            niche=niche, network=network, country=country,
+            limit=limit, simulate=simulate, token=token,
+        )
+        return {
+            "count": len(offers),
+            "niche": niche,
+            "network": network or "all",
+            "country": country,
+            "simulate": simulate,
+            "offers": offers,
+        }
+
+    @app.get("/v1/metrics")
+    def metrics(
+        niche: str | None = Query(default=None),
+        country: str = Query(default="BR"),
+        simulate: bool = Query(default=True),
+        token: str = Query(default=""),
+    ) -> dict:
+        """Métricas de mercado agregadas (redes, nichos, sinais, ROI, top escalando)."""
+        offers = discover_offers(
+            niche=niche, country=country, limit=60,
+            simulate=simulate, token=token,
+        )
+        return compute_metrics(offers)
+
+    @app.get("/v1/offers/{offer_id}")
+    def get_offer(offer_id: str) -> dict:
+        """Detalhe de uma oferta específica (ID determinístico)."""
+        o = get_offer_by_id(offer_id, simulate=True)
+        if o is None:
+            raise HTTPException(404, "oferta não encontrada")
+        return o
 
     return app
 

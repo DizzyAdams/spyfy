@@ -3,6 +3,8 @@
 // Toda chamada é defensiva: em caso de falha retorna `null` para a UI
 // poder degradar graciosamente (ex.: mostrar "backend offline") em vez de quebrar.
 
+import { type Offer } from "@/lib/data";
+
 export interface ApiHealth {
   status: string;
   service: string;
@@ -106,3 +108,60 @@ export const postNotify = (body: NotifyRequest) =>
     method: "POST",
     body: JSON.stringify(body),
   });
+
+// --- Ofertas reais + métricas de mercado (backend /v1/offers, /v1/metrics) ---
+
+export interface OfferMetrics {
+  total: number;
+  byNetwork: Record<string, number>;
+  byNiche: Record<string, number>;
+  bySignal: Record<string, number>;
+  avgWinningScore: number;
+  avgLongevityDays: number;
+  avgRoiPct: number;
+  avgDailyProfit: number;
+  avgWinProb: number;
+  scalingShare: number;
+  topScaled: Array<{
+    id?: string;
+    headline?: string;
+    advertiser?: string;
+    network?: string;
+    niche?: string;
+    winningScore?: number;
+    scalingSignal?: string;
+    estRoiPct?: number;
+    winProb?: number;
+    estImpressions?: number;
+  }>;
+  generatedAt?: string;
+}
+
+export interface OffersQuery {
+  niche?: string;
+  network?: string;
+  country?: string;
+  limit?: number;
+  simulate?: boolean;
+}
+
+function toQueryString(params: Record<string, string | number | boolean | undefined>): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== "") sp.set(k, String(v));
+  }
+  const s = sp.toString();
+  return s ? `?${s}` : "";
+}
+
+/** Melhores / mais escaladas ofertas das Ad Libraries (enriquecidas com ROI/win-prob). */
+export const getOffers = (params: OffersQuery = {}) =>
+  apiFetch<{ count: number; offers: Offer[]; simulate: boolean }>(
+    `/v1/offers${toQueryString(params as Record<string, string | number | boolean | undefined>)}`,
+  );
+
+/** Métricas de mercado agregadas (redes, nichos, sinais, ROI, top escalando). */
+export const getMetrics = (params: { niche?: string; country?: string; simulate?: boolean } = {}) =>
+  apiFetch<OfferMetrics>(
+    `/v1/metrics${toQueryString(params as Record<string, string | number | boolean | undefined>)}`,
+  );
