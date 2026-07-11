@@ -8,7 +8,7 @@ Auditoria automatizada do estado do projeto. Atualizada a cada rodada.
 |------|--------|
 | Imports do pacote `spyfy` | ✅ OK (32 símbolos) |
 | Sintaxe de todos os módulos `.py` | ✅ OK |
-| Suíte de testes | ✅ **56/56 passando** |
+| Suíte de testes | ✅ **118/118 passando** |
 | API FastAPI executável | ✅ (`/health`, `/docs`) |
 | Dockerfile produção | ✅ não-root + healthcheck |
 | Config 12-factor (env) | ✅ |
@@ -41,7 +41,9 @@ Auditoria automatizada do estado do projeto. Atualizada a cada rodada.
 | `proxy_pool.py` | 3 | proxy anti-Cloudflare (Loop 7) |
 | `crm.py` | 4 | CRM integrado (Loop 8) |
 | `cart.py` | 5 | carrinho/page builder/garantia (Loop 9) |
-| **Total** | **94** | — |
+| `test_agents_memory.py` | 6 | memória RAG (chromadb), embeddings, dedup |
+| `test_agents_orchestrator.py` | 6 | grafo autônomo LangGraph E2E offline |
+| **Total** | **118** | — |
 
 ## Cobertura de testes por módulo
 
@@ -54,7 +56,9 @@ Auditoria automatizada do estado do projeto. Atualizada a cada rodada.
 | `events.py` | 7 | pub/sub, wildcards, DLQ, replay |
 | `agents/notify_agent.py` | 5 | E2E evento→notificação |
 | `api/app.py` | 10 | endpoints REST |
-| **Total** | **94** | — |
+| `test_agents_memory.py` | 6 | memória RAG (chromadb), embeddings, dedup |
+| `test_agents_orchestrator.py` | 6 | grafo autônomo LangGraph E2E offline |
+| **Total** | **118** | — |
 
 ## Inventário de código (`apps/workers-py`)
 
@@ -299,9 +303,43 @@ python -m ruff check spyfy tests   # All checks passed!
 ### Status por camada (ao fim da rodada)
 | Camada | Estado |
 |--------|--------|
-| Backend Python | 🟢 VERDE (106 passed · mypy 0 · ruff 0) |
+| Backend Python | 🟢 VERDE (118 passed · mypy 0 · ruff 0) |
 | Frontend Next.js | 🟢 VERDE (build OK · 0 vulns prod) |
 | Visualizador de Ofertas | 🟢 funcional · backlog a11y/UX documentado |
 | Campanhas Validadas (Ad Libraries) | 🟢 real Meta/TikTok/Google ativas · fallback intacto |
+
+| Campanhas Validadas (Ad Libraries) | 🟢 real Meta/TikTok/Google ativas · fallback intacto |
+
+## Camada de Agentes Autônomos (LangGraph + RAG)
+
+Implementada a partir de `docs/14-mining/team-14-agents.md` e
+`docs/07-ai/langgraph-architecture.md`. É o "digital workforce" que descobre,
+enriquece, extrai copy, calcula ROI, indexa em memória RAG, faz QA e dispara
+alertas — **100% offline e determinístico** (sem chamar LLM), com hook opcional
+de LLM (`langchain` `BaseChatModel`) para enriquecimento/copy.
+
+| Módulo | Papel |
+|--------|-------|
+| `spyfy/agents/state.py` | `OfferState` (TypedDict) — estado durável do grafo |
+| `spyfy/agents/memory.py` | `OfferMemory` (RAG sobre chromadb) + `HashEmbedding` (offline) / `ModelEmbedding` (sentence-transformers) |
+| `spyfy/agents/orchestrator.py` | `build_offer_graph()` + `run_offer_pipeline[_sync]()` — supervisor + 7 sub-agents (scout/enricher/copy/roi/dedup/guard/alert) |
+| `spyfy/agents/__init__.py` | exports públicos |
+
+**Decisões de engenharia:**
+- **RAG determinístico:** similaridade por cosseno próprio (`_cosine`) sobre os
+  embeddings armazenados, não pela distância do HNSW do chromadb (instável p/
+  embeddings hash pequenos). O chromadb segue sendo o store persistente.
+- **Embeddings offline por padrão** (`HashEmbedding`, bag-of-words com hashing,
+  L2-normalizado) — sem GPU/rede; `ModelEmbedding` opcional para qualidade.
+- **Telemetria do chromadb desligada** (`anonymized_telemetry=False`) — sem
+  chamadas de rede e sem ruído de log.
+- **Checkpointer** (`MemorySaver`) por `thread_id` → retomada durável e
+  human-in-the-loop (padrão da arquitetura LangGraph).
+- **Degradação graciosa:** roda sem API key/LLM usando `scraper_bridge.mine`
+  (simulado), `roi.estimate_offer` e `radar.win_probability` como "tools".
+
+**Status:** 🟢 VERDE — 12 testes novos (`test_agents_memory.py`,
+`test_agents_orchestrator.py`), 118 no total. mypy 0 · ruff 0.
+
 
 

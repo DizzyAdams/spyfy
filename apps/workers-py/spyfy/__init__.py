@@ -13,7 +13,9 @@ from .crm import (CRM, Contact, Deal, Stage, ActivityType)
 from .cart import (AbandonedCart, CartStatus, PageRequest, PageBlock,
                  build_page, evaluate_guarantee, SLA_SECONDS)
 from .events import DomainEvent, EventBus, DeadLetter, EVENT_TYPES
-from .agents import NotifyAgent, EVENT_MAP
+from .agents import (NotifyAgent, EVENT_MAP, OfferMemory, HashEmbedding,
+                    ModelEmbedding, OfferState, MEMBERS, build_offer_graph,
+                    run_offer_pipeline, run_offer_pipeline_sync)
 from .personalization import (Persona, UserContext, Widget, build_home_tab,
                               infer_persona)
 from .retention import (UsageSnapshot, HealthResult, ChurnRisk, health_score,
@@ -44,6 +46,9 @@ __all__ = ["AdSignals", "NicheEconomics", "ScoreWeights", "OfferEstimate",
            "build_page", "evaluate_guarantee", "SLA_SECONDS",
            "DomainEvent", "EventBus", "DeadLetter", "EVENT_TYPES",
            "NotifyAgent", "EVENT_MAP",
+           "OfferMemory", "HashEmbedding", "ModelEmbedding", "OfferState",
+           "MEMBERS", "build_offer_graph", "run_offer_pipeline",
+           "run_offer_pipeline_sync",
            "Persona", "UserContext", "Widget", "build_home_tab", "infer_persona",
            "UsageSnapshot", "HealthResult", "ChurnRisk", "health_score",
            "should_trigger_winback", "expansion_ready",

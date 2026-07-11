@@ -13,6 +13,7 @@ dependencies = [
   "langchain-openai>=0.1",
   "pydantic>=2.7",
   "openai-whisper>=20231117",
+  "chromadb>=0.5",
 ]
 
 [project.optional-dependencies]
@@ -32,5 +33,15 @@ build-backend = "hatchling.build"
 [[tool.mypy.overrides]]
 # apprise e' importado localmente (runtime opcional) e nao possui stubs
 module = "apprise"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# chromadb possui py.typed parcial; evita ruido de tipos internos
+module = "chromadb.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# sentence-transformers e' importado localmente (runtime opcional)
+module = "sentence_transformers"
 ignore_missing_imports = true
 

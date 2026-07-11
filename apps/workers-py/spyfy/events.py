@@ -105,6 +105,10 @@ def _match(pattern: str, event_type: str) -> bool:
 EVENT_TYPES = {
     "offer.discovered", "offer.scaling", "offer.enriched",
     "advertiser.new_creative",
+    "copy.extracted",
+    "roi.computed",
+    "offer.indexed",
+    "guard.qa",
     "clone.requested", "clone.completed", "clone.failed",
     "alert.triggered",
     "checkout.created", "order.paid", "upsell.accepted", "refund.created",
