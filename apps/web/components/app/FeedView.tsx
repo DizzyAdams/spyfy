@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { SlidersHorizontal, Activity, Users, Layers, WifiOff } from "lucide-react";
+import { SlidersHorizontal, Activity, Users, Layers, WifiOff, Search, X } from "lucide-react";
 import { NETWORKS, type Network, type Offer } from "@/lib/data";
 import { OfferCard } from "../OfferCard";
 import { LiveBadge } from "./LiveBadge";
@@ -163,7 +163,11 @@ export function FeedView() {
     const q = query.trim().toLowerCase();
     if (q) {
       r = r.filter((o) =>
-        `${o.headline} ${o.advertiser} ${o.niche} ${o.cta}`.toLowerCase().includes(q)
+        `${o.headline} ${o.advertiser} ${o.niche} ${o.cta} ${
+          (o.bullets ?? []).join(" ")
+        } ${(o.funnel ?? []).map((f) => f.label).join(" ")} ${
+          o.format
+        } ${o.country}`.toLowerCase().includes(q)
       );
     }
     return [...r].sort((a, b) =>
@@ -266,6 +270,28 @@ export function FeedView() {
             ))}
           </select>
 
+          {/* Busca por termo — funciona offline (filstra o feed local). */}
+          <div className="relative flex min-w-[180px] flex-1 items-center gap-2 rounded-full border border-border bg-surface/60 px-3 py-1">
+            <Search size={14} className="shrink-0 text-muted" aria-hidden />
+            <input
+              value={query}
+              onChange={(e) => search(e.target.value)}
+              placeholder="Buscar ofertas, anunciantes, ângulos…"
+              aria-label="Buscar ofertas"
+              className="w-full bg-transparent text-xs text-text outline-none placeholder:text-muted"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => search("")}
+                aria-label="Limpar busca"
+                className="shrink-0 text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as "score" | "longevity")}
@@ -298,7 +324,10 @@ export function FeedView() {
 
           {results.length === 0 && (
             <div className="rounded-2xl border border-dashed border-border p-12 text-center text-muted">
-              Nenhuma oferta para esses filtros. Ajuste rede, nicho ou país para ver mais
+              {query.trim()
+                ? `Nenhum resultado para “${query.trim()}”.`
+                : "Nenhuma oferta para esses filtros."}
+              {" "}Ajuste rede, nicho, país ou busca para ver mais
               vencedoras.{" "}
               <button
                 onClick={() => {
