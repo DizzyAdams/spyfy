@@ -24,6 +24,8 @@ from .digest import (FeedOffer, UserFeedPrefs, rank_feed, build_digest,
                      personalized_score, optimal_send_hour)
 from .radar import (RadarQuery, RadarOffer, run_radar, win_probability,
                     early_mover_bonus, radar_report, should_alert)
+from .meta_library import MetaAdLibrary, MetaScrapeError
+
 
 __all__ = ["AdSignals", "NicheEconomics", "ScoreWeights", "OfferEstimate",
            "estimate_offer", "rank_offers",
@@ -48,5 +50,7 @@ __all__ = ["AdSignals", "NicheEconomics", "ScoreWeights", "OfferEstimate",
            "FeedOffer", "UserFeedPrefs", "personalized_score", "rank_feed",
            "build_digest", "optimal_send_hour",
            "RadarQuery", "RadarOffer", "run_radar", "win_probability",
+           "MetaAdLibrary", "MetaScrapeError",
+
            "early_mover_bonus", "radar_report", "should_alert"]
 __version__ = "0.1.0"

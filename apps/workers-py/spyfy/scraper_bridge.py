@@ -75,19 +75,36 @@ def build_offer(niche: str, network: str, i: int) -> dict:
     }
 
 
-def mine(niche: str, network: str, count: int = 1) -> list[dict]:
-    """Substitua por chamada real ao Ad Library / Playwright quando pronto."""
+def mine(niche: str, network: str, count: int = 1, simulate: bool = False,
+          token: str = "", country: str = "BR") -> list[dict]:
+    """Busca REAL no Meta Ad Library quando network=='meta' e não é simulate.
+    Fallback para o gerador estruturado (build_offer) em caso de bloqueio/erro
+    (login wall, sem token válido, rede indisponível)."""
     net = network if network in NETWORKS else random.choice(NETWORKS)
+    if net == "meta" and not simulate:
+        try:
+            from .meta_library import MetaAdLibrary
+
+            lib = MetaAdLibrary(access_token=token, country=country)
+            found = lib.search(niche, limit=count)
+            for o in found:
+                o["niche"] = niche
+            if found:
+                return found[:count]
+        except Exception:  # noqa: BLE001 - fallback explícito ao simulador
+            pass
     return [build_offer(niche, net, i) for i in range(count)]
 
 
 def run_loop(niche: str, network: str, base_url: str, token: str,
-             interval: float, rounds: int) -> int:
+             interval: float, rounds: int, simulate: bool = False,
+             country: str = "BR") -> int:
     print(f"[scraper] minerando '{niche}'/{network} -> {base_url} "
-          f"(interval={interval}s, rounds={rounds})")
+          f"(interval={interval}s, rounds={rounds}, simulate={simulate})")
     total = 0
     for r in range(rounds):
-        offers = mine(niche, network, count=random.randint(1, 3))
+        offers = mine(niche, network, count=random.randint(1, 3),
+                      simulate=simulate, token=token, country=country)
         result = push_bulk(offers, base_url, token)
         ok = result.get("ok")
         print(f"  round {r + 1}: ingested={result.get('ingested')} ok={ok}")
@@ -108,10 +125,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--network", default="meta")
     ap.add_argument("--interval", type=float, default=3.0)
     ap.add_argument("--rounds", type=int, default=5)
+    ap.add_argument("--country", default="BR")
+    ap.add_argument("--simulate", action="store_true",
+                    help="força o gerador estruturado (não busca no Meta)")
     args = ap.parse_args(argv)
 
     sent = run_loop(args.niche, args.network, args.url, args.token,
-                    args.interval, args.rounds)
+                    args.interval, args.rounds, args.simulate, args.country)
     return 0 if sent >= 0 else 1
 
 
