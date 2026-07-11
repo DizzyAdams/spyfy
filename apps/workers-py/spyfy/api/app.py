@@ -9,6 +9,9 @@ Endpoints:
   POST /v1/notify                  -> roteia+entrega notificação (dispatcher)
   POST /v1/webhooks/{provider}     -> recebe webhook assinado (NexusTracker/Darkfy)
   GET  /v1/events/types            -> catálogo de eventos
+  POST /v1/agents/run              -> pipeline autônomo (scout->enrich->copy->roi->dedup->guard->alert)
+  POST /v1/agents/rag/query        -> recuperação semântica na memória RAG
+  GET  /v1/agents/rag/count        -> nº de ofertas indexadas na memória RAG
 """
 from __future__ import annotations
 
@@ -19,14 +22,15 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from .. import __version__
+from ..agents import MEMBERS, OfferMemory, run_offer_pipeline
 from ..events import EVENT_TYPES, DomainEvent, EventBus
 from ..notifications import (Channel, Notification, NotificationPrefs, Priority)
 from ..notifiers import (AppriseAdapter, NotificationDispatcher, NovuAdapter,
                          NtfyAdapter, WebhookAdapter)
 from ..roi import AdSignals, NicheEconomics, estimate_offer
 from ..webhooks import DedupStore, parse_event, verify_webhook
-from .schemas import (EstimateRequest, EstimateResponse, Health, NotifyRequest,
-                      NotifyResponse, WebhookAck)
+from .schemas import (AgentRunRequest, EstimateRequest, EstimateResponse, Health,
+                      NotifyRequest, NotifyResponse, RagQueryRequest, WebhookAck)
 
 
 def build_dispatcher() -> NotificationDispatcher:
@@ -43,8 +47,12 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
     bus = EventBus()
     dispatcher = dispatcher or build_dispatcher()
     dedup = DedupStore()
+    # Memória RAG compartilhada (ephemeral em memória) — persiste ofertas
+    # indexadas pelo pipeline autônomo e responde consultas semânticas.
+    memory = OfferMemory()
     app.state.bus = bus
     app.state.dispatcher = dispatcher
+    app.state.memory = memory
 
     # CORS: permite que o frontend (Vercel em produção + localhost em dev)
     # chame a API a partir do navegador. Origens configuráveis via CORS_ORIGINS.
@@ -134,6 +142,34 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
         bus.publish(DomainEvent(event["event_id"], event["type"],
                                 event.get("data", {})))
         return WebhookAck(ok=True)
+
+    @app.post("/v1/agents/run")
+    async def agent_run(req: AgentRunRequest) -> dict:
+        """Dispara o grafo autônomo (LangGraph) de mineração -> enriquecimento.
+
+        Conecta o orquestrador ao EventBus e à memória RAG da aplicação: os
+        alertas (A13) são publicados no bus e as ofertas ficam indexadas para
+        recuperação semântica. Roda offline por padrão (sem LLM).
+        """
+        final = await run_offer_pipeline(
+            req.objective,
+            niche=req.niche, network=req.network, country=req.country,
+            min_score=req.min_score, memory=app.state.memory, bus=bus,
+            simulate=req.simulate, count=req.count, thread_id=req.thread_id,
+        )
+        final["members"] = MEMBERS  # documenta a topologia disponível
+        return final
+
+    @app.post("/v1/agents/rag/query")
+    def rag_query(req: RagQueryRequest) -> dict:
+        """Recuperação semântica (RAG) sobre a memória de ofertas indexadas."""
+        hits = app.state.memory.query(req.text, n=req.n)
+        return {"query": req.text, "count": len(hits), "hits": hits}
+
+    @app.get("/v1/agents/rag/count")
+    def rag_count() -> dict:
+        """Nº de ofertas indexadas na memória RAG (long-term memory)."""
+        return {"count": app.state.memory.count()}
 
     return app
 

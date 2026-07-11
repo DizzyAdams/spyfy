@@ -115,3 +115,28 @@ def test_webhook_dedup(client):
     r2 = client.post("/v1/webhooks/darkfy", content=body, headers=h)
     assert r1.json()["dedup"] is False
     assert r2.json()["dedup"] is True
+def test_agents_run_pipeline(client):
+    r = client.post("/v1/agents/run", json={
+        "objective": "keto", "niche": "keto", "network": "meta",
+        "country": "BR", "count": 2, "simulate": True,
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data["discovered_ads"]) == 2
+    assert set(data["done_steps"]) == set(data["members"])
+    assert data["analytics"]["best"] is not None
+    assert isinstance(data["confidence"], (int, float))
+
+
+def test_agents_rag_query_and_count(client):
+    client.post("/v1/agents/run", json={
+        "objective": "keto", "niche": "keto", "network": "meta",
+        "count": 2, "simulate": True,
+    })
+    c = client.get("/v1/agents/rag/count")
+    assert c.status_code == 200
+    assert c.json()["count"] == 2
+    q = client.post("/v1/agents/rag/query", json={"text": "Emagreca 7kg", "n": 3})
+    assert q.status_code == 200
+    assert q.json()["count"] >= 1
+    assert q.json()["hits"][0]["similarity"] is not None

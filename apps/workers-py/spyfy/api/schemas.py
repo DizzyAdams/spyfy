@@ -63,6 +63,24 @@ class WebhookAck(BaseModel):
     dedup: bool = False
 
 
+class AgentRunRequest(BaseModel):
+    """Dispara o pipeline autônomo de mineração -> enriquecimento (LangGraph)."""
+    objective: str = "Encontrar ofertas vencedoras"
+    niche: str | None = None
+    network: str | None = None
+    country: str | None = None
+    min_score: float = 0.0
+    count: int = 3
+    simulate: bool = True
+    thread_id: str | None = None
+
+
+class RagQueryRequest(BaseModel):
+    """Consulta a memória RAG de ofertas (recuperação semântica)."""
+    text: str
+    n: int = 5
+
+
 class ErrorBody(BaseModel):
     code: str
     message: str
