@@ -1,84 +1,82 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Search, Copy, FileText, Bot, BarChart3, Bell, Library, ShieldCheck } from "lucide-react";
-import { staggerContainer, fadeUp } from "@/lib/motion";
+import { Radar, Copy, Bot, Crosshair, Activity, BellRing } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { staggerContainer, revealUp, cardHover } from "@/lib/motion";
 
-const features = [
+type Feature = {
+  icon: typeof Radar;
+  title: string;
+  desc: string;
+  span: string;
+  accent: "primary" | "accent";
+  big?: boolean;
+};
+
+const features: Feature[] = [
   {
-    icon: Search,
-    title: "Discovery inteligente",
-    desc: "Busca híbrida (BM25 + kNN semântico) sobre bilhões de anúncios. Filtros combináveis e ranking por winning score.",
-    span: "lg:col-span-2",
-    accent: "#6E56CF",
+    icon: Radar,
+    title: "Descoberta",
+    desc: "Varredura híbrida — BM25 + kNN semântico — sobre bilhões de criativos. Filtre por vertical, formato e país e ranqueie por winning score.",
+    span: "lg:col-span-4 lg:row-span-2",
+    accent: "primary",
+    big: true,
   },
   {
     icon: Copy,
-    title: "Offer Cloner",
-    desc: "Reconstrói LP + funil inteiro (checkout, upsell, downsell) em < 60s, com fidelidade > 95%.",
-    span: "",
-    accent: "#22D3EE",
-  },
-  {
-    icon: FileText,
-    title: "Transcrição de VSL",
-    desc: "Whisper + LLM transcrevem e resumem vídeos longos, com marcação de estrutura (hook, problema, solução, CTA).",
-    span: "",
-    accent: "#EC4899",
+    title: "Clone de funil",
+    desc: "Reconstrói landing, checkout, upsell e downsell em menos de 60s, com fidelidade acima de 95%.",
+    span: "lg:col-span-2",
+    accent: "accent",
   },
   {
     icon: Bot,
-    title: "Sub-agents de IA",
-    desc: "Agentes LangGraph raspam, classificam e reconstroem ofertas 24/7 — sem você levantar um dedo.",
+    title: "IA agentic",
+    desc: "Agentes LangGraph raspam, classificam e reconstroem ofertas 24/7 — sem você tocar em nada.",
     span: "lg:col-span-2",
-    accent: "#16A34A",
+    accent: "primary",
   },
   {
-    icon: BarChart3,
-    title: "Analytics de mercado",
-    desc: "Trend radar, saturation index e competitor watch em dashboards OLAP em tempo quase real.",
-    span: "",
-    accent: "#F97316",
-  },
-  {
-    icon: Bell,
-    title: "Alertas em tempo real",
-    desc: "Saiba no instante em que um concorrente entra em escala. Slack, e-mail, webhook ou app.",
-    span: "",
-    accent: "#2563EB",
-  },
-  {
-    icon: Library,
-    title: "Swipe file colaborativo",
-    desc: "Coleções compartilhadas, tags e histórico imutável. Nada se perde quando o anúncio sai do ar.",
-    span: "",
-    accent: "#A855F7",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Garantia 24h de fidelidade",
-    desc: "QA agent valida cada clone antes de liberar. Você exporta um ZIP pronto pra hospedar.",
+    icon: Crosshair,
+    title: "Radar de nichos",
+    desc: "Trend radar, saturation index e competitor watch em tempo quase real. Veja onde o sinal está nascendo.",
     span: "lg:col-span-2",
-    accent: "#22D3EE",
+    accent: "accent",
+  },
+  {
+    icon: Activity,
+    title: "Longevidade real",
+    desc: "Saiu do ar ou ainda escala? Acompanhe o ciclo de vida de cada oferta e copie só o que está vivo.",
+    span: "lg:col-span-2",
+    accent: "primary",
+  },
+  {
+    icon: BellRing,
+    title: "Alertas",
+    desc: "Saiba no instante em que um concorrente entra em escala. Slack, e-mail, webhook ou push no app.",
+    span: "lg:col-span-2",
+    accent: "accent",
   },
 ];
 
 export function Features() {
   return (
-    <section id="recursos" className="relative mx-auto max-w-7xl px-5 py-24">
+    <section id="recursos" className="relative mx-auto max-w-7xl px-5 py-24 sm:py-28">
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, margin: "-80px" }}
+        variants={revealUp}
         className="mb-12 max-w-2xl"
       >
         <span className="chip mb-4 !text-primary">Recursos</span>
-        <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          Tudo que você precisa pra <span className="gradient-text">vencer no tráfego</span>
+        <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl md:text-[2.75rem]">
+          O console de reconhecimento que separa o{" "}
+          <span className="gradient-text">sinal do ruído</span>
         </h2>
-        <p className="mt-3 text-muted">
-          Não é só “ver anúncio”. É encontrar a oferta certa, entender o funil e ter o clone na mão — num só lugar.
+        <p className="mt-4 text-muted">
+          Não é só ver anúncio. É encontrar a oferta viva, entender o funil e ter o clone na mão — num só lugar.
         </p>
       </motion.div>
 
@@ -86,23 +84,51 @@ export function Features() {
         variants={staggerContainer}
         initial="hidden"
         whileInView="show"
-        viewport={{ once: true, margin: "-60px" }}
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        viewport={{ once: true, margin: "-80px" }}
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6 lg:auto-rows-[minmax(11rem,auto)]"
       >
         {features.map((f) => (
           <motion.div
             key={f.title}
-            variants={fadeUp}
-            className={`bento group p-5 ${f.span}`}
+            variants={revealUp}
+            className={cn("min-w-0", f.span)}
           >
-            <div
-              className="mb-4 grid h-11 w-11 place-items-center rounded-xl"
-              style={{ background: `${f.accent}1f`, color: f.accent }}
+            <motion.div
+              variants={cardHover}
+              initial="rest"
+              animate="rest"
+              whileHover="hover"
+              className="bento group relative flex h-full flex-col overflow-hidden rounded-2xl p-6 transition-colors duration-300 hover:border-primary/40"
             >
-              <f.icon size={22} />
-            </div>
-            <h3 className="text-base font-semibold text-text">{f.title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted">{f.desc}</p>
+              <span
+                aria-hidden
+                className={cn(
+                  "pointer-events-none absolute -top-16 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-primary/20 opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100",
+                  f.accent === "accent" && "bg-accent/20",
+                )}
+              />
+              <div
+                className={cn(
+                  "relative z-10 mb-5 grid h-11 w-11 place-items-center rounded-xl border border-border-strong bg-surface-2",
+                  f.accent === "primary" ? "text-primary" : "text-accent",
+                )}
+              >
+                <f.icon size={22} strokeWidth={1.75} />
+              </div>
+              <h3 className="relative z-10 font-display text-lg font-semibold tracking-tight text-text">
+                {f.title}
+              </h3>
+              <p className="relative z-10 mt-2 text-sm leading-relaxed text-muted">
+                {f.desc}
+              </p>
+
+              {f.big && (
+                <div className="relative z-10 mt-auto flex flex-wrap items-center gap-3 pt-7">
+                  <span className="chip !text-primary">BM25 + kNN</span>
+                  <span className="font-mono text-xs text-faint">2.4B creatives indexados</span>
+                </div>
+              )}
+            </motion.div>
           </motion.div>
         ))}
       </motion.div>

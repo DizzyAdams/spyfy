@@ -3,28 +3,38 @@
 @tailwind utilities;
 
 :root {
-  /* superfícies */
-  --bg: #0b0d12;
-  --surface: #151922;
-  --surface-2: #1b2130;
-  /* texto (contraste AA) */
-  --text: #e6e8ec;
-  --muted: #9aa4b2;
-  /* marca */
-  --primary: #6e56cf;
-  --primary-hover: #7c66d9;
-  --accent: #22d3ee;
-  /* semânticos */
-  --success: #16a34a;
-  --warning: #d97706;
-  --danger: #dc2626;
-  --info: #2563eb;
-  /* bordas/estados */
-  --border: #263042;
-  --ring: #6e56cf;
+  /* Canvas (near-black, faint blue-violet cast) */
+  --bg: #06070b;
+  --surface: #0e1016;
+  --surface-2: #14161f;
+  --surface-3: #1b1e2a;
+  /* Text */
+  --text: #eaecef;
+  --muted: #8a90a2;
+  --faint: #5a6072;
+  /* Signal / brand (signature duotone = violet -> cyan) */
+  --violet: #7c5cff;
+  --violet-soft: #a78bfa;
+  --cyan: #2dd4ff;
+  --lime: #c6f24e;
+  /* Semantic */
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
+  --info: #60a5fa;
+  /* Borders / focus */
+  --border: #20232f;
+  --border-strong: #2c3040;
+  --ring: #7c5cff;
+  /* Tailwind color aliases (kept for utility/component compatibility) */
+  --primary: #7c5cff;
+  --primary-hover: #8b6dff;
+  --accent: #2dd4ff;
 
+  /* Typography */
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
 }
 
 * {
@@ -46,7 +56,7 @@ body {
 
 /* Seleção */
 ::selection {
-  background: rgba(110, 86, 207, 0.35);
+  background: rgba(124, 92, 255, 0.35);
   color: #fff;
 }
 
@@ -59,40 +69,84 @@ body {
   background: var(--bg);
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a3344;
+  background: #2a2e3d;
   border-radius: 999px;
   border: 2px solid var(--bg);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #38445c;
+  background: #39405a;
 }
 
 @layer components {
-  /* Glassmorphism overlay */
+  /* Glassmorphism overlay — refined blur + 1px hairline */
   .glass {
-    background: rgba(21, 25, 34, 0.6);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: rgba(20, 22, 31, 0.55);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
     border: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   .glass-strong {
-    background: rgba(15, 18, 25, 0.8);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: rgba(14, 16, 22, 0.8);
+    backdrop-filter: blur(22px) saturate(140%);
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  /* Bento cards */
+  /* Solid elevated surface */
+  .surface {
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  /* Fine grain / noise overlay (pointer-events-none) */
+  .grain {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    z-index: 1;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+    mix-blend-mode: overlay;
+  }
+
+  /* 1px gradient hairline — pair with `animate-sweep` inside an overflow-hidden parent */
+  .signal-line {
+    position: relative;
+    height: 1px;
+    width: 100%;
+    background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+    overflow: hidden;
+  }
+  .signal-line::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 35%;
+    background: linear-gradient(90deg, transparent, var(--violet-soft), var(--cyan), transparent);
+    filter: blur(0.4px);
+    will-change: transform;
+  }
+
+  /* Display font utility */
+  .font-display {
+    font-family: var(--font-display), "Space Grotesk", system-ui, sans-serif;
+  }
+
+  /* Bento cards — 1px border + subtle violet glow on hover */
   .bento {
-    background: linear-gradient(180deg, rgba(27, 33, 48, 0.7), rgba(21, 25, 34, 0.7));
+    background: linear-gradient(180deg, rgba(27, 30, 42, 0.72), rgba(14, 16, 22, 0.72));
     border: 1px solid var(--border);
     border-radius: 16px;
     transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
   }
   .bento:hover {
-    border-color: rgba(110, 86, 207, 0.5);
-    box-shadow: 0 0 0 1px rgba(110, 86, 207, 0.25), 0 12px 50px -16px rgba(110, 86, 207, 0.45);
+    border-color: rgba(124, 92, 255, 0.45);
+    box-shadow: 0 0 0 1px rgba(124, 92, 255, 0.25), 0 14px 60px -18px rgba(124, 92, 255, 0.5);
   }
 
   .chip {
@@ -113,13 +167,15 @@ body {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    border-radius: 8px;
+    border-radius: 10px;
     font-weight: 600;
     font-size: 14px;
     padding: 11px 18px;
-    transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease,
+      border-color 0.2s ease;
     cursor: pointer;
     border: 1px solid transparent;
+    will-change: transform;
   }
   .btn:active {
     transform: scale(0.98);
@@ -127,22 +183,26 @@ body {
   .btn-primary {
     background: var(--primary);
     color: #fff;
-    box-shadow: 0 8px 30px -10px rgba(110, 86, 207, 0.7);
+    box-shadow: 0 0 0 1px rgba(124, 92, 255, 0.4), 0 10px 40px -12px rgba(124, 92, 255, 0.75),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
   .btn-primary:hover {
     background: var(--primary-hover);
+    box-shadow: 0 0 0 1px rgba(124, 92, 255, 0.55), 0 14px 50px -12px rgba(124, 92, 255, 0.85),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12);
   }
   .btn-ghost {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.03);
     color: var(--text);
     border-color: var(--border);
   }
   .btn-ghost:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.07);
+    border-color: var(--border-strong);
   }
 
   .gradient-text {
-    background: linear-gradient(92deg, #fff 0%, #c9b8ff 45%, var(--accent) 100%);
+    background: linear-gradient(92deg, var(--violet-soft) 0%, var(--violet) 42%, var(--cyan) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -150,16 +210,17 @@ body {
 
   .hairline {
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
   }
 }
 
-/* Animated grid background */
+/* Animated grid background (subtler) */
 .grid-bg {
-  background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 50%, transparent 100%);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
 }
 
 /* Focus ring (WCAG) */

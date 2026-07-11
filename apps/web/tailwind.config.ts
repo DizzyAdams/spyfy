@@ -10,33 +10,47 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: "#0B0D12",
-        surface: "#151922",
-        "surface-2": "#1B2130",
-        text: "#E6E8EC",
-        muted: "#9AA4B2",
-        primary: "#6E56CF",
-        "primary-hover": "#7C66D9",
-        accent: "#22D3EE",
-        success: "#16A34A",
-        warning: "#D97706",
-        danger: "#DC2626",
-        info: "#2563EB",
-        border: "#263042",
-        ring: "#6E56CF",
+        // Canvas
+        bg: "#06070B",
+        surface: "#0E1016",
+        "surface-2": "#14161F",
+        "surface-3": "#1B1E2A",
+        // Text
+        text: "#EAECF2",
+        muted: "#8A90A2",
+        faint: "#5A6072",
+        // Signal / brand (signature duotone = violet -> cyan)
+        primary: "#7C5CFF",
+        "primary-hover": "#8B6DFF",
+        "violet-soft": "#A78BFA",
+        accent: "#2DD4FF",
+        lime: "#C6F24E",
+        // Semantic
+        success: "#34D399",
+        warning: "#FBBF24",
+        danger: "#FB7185",
+        info: "#60A5FA",
+        // Borders / focus
+        border: "#20232F",
+        "border-strong": "#2C3040",
+        ring: "#7C5CFF",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "Inter", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "JetBrains Mono", "ui-monospace", "monospace"],
+        display: ["var(--font-display)", "Space Grotesk", "system-ui", "sans-serif"],
       },
       borderRadius: {
         lg: "8px",
         xl: "12px",
         "2xl": "16px",
+        "3xl": "24px",
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(110,86,207,0.25), 0 8px 40px -12px rgba(110,86,207,0.45)",
-        "glow-accent": "0 0 0 1px rgba(34,211,238,0.2), 0 8px 40px -12px rgba(34,211,238,0.35)",
+        glow: "0 0 0 1px rgba(124,92,255,0.30), 0 10px 50px -12px rgba(124,92,255,0.55)",
+        "glow-accent": "0 0 0 1px rgba(45,212,255,0.22), 0 10px 50px -12px rgba(45,212,255,0.40)",
+        "glow-cyan": "0 0 0 1px rgba(45,212,255,0.22), 0 10px 50px -12px rgba(45,212,255,0.45)",
+        "glow-lime": "0 0 0 1px rgba(198,242,78,0.22), 0 10px 50px -12px rgba(198,242,78,0.40)",
       },
       keyframes: {
         "fade-up": {
@@ -46,18 +60,38 @@ const config: Config = {
         shimmer: {
           "100%": { transform: "translateX(100%)" },
         },
+        plasma: {
+          "0%": {
+            transform: "translate3d(0,0,0) scale(1)",
+            filter: "hue-rotate(0deg)",
+          },
+          "50%": {
+            transform: "translate3d(2%,-2%,0) scale(1.06)",
+            filter: "hue-rotate(28deg)",
+          },
+          "100%": {
+            transform: "translate3d(0,0,0) scale(1)",
+            filter: "hue-rotate(0deg)",
+          },
+        },
+        sweep: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(100%)" },
+        },
         "pulse-ring": {
           "0%": { transform: "scale(0.8)", opacity: "0.7" },
           "100%": { transform: "scale(2.2)", opacity: "0" },
         },
         float: {
-          "0%,100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-10px)" },
+          "0%,100%": { transform: "translateY(-10px)" },
+          "50%": { transform: "translateY(10px)" },
         },
       },
       animation: {
         "fade-up": "fade-up 0.5s ease-out both",
         "pulse-ring": "pulse-ring 1.8s ease-out infinite",
+        plasma: "plasma 18s ease-in-out infinite",
+        sweep: "sweep 3.5s ease-in-out infinite",
         float: "float 6s ease-in-out infinite",
       },
     },

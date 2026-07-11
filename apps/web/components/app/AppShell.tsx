@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -12,7 +13,9 @@ import {
   Search,
   Command,
 } from "lucide-react";
-import { Logo } from "../illustrations/Logo";
+import Logo from "../illustrations/Logo";
+import { LiveBadge } from "./LiveBadge";
+import { useRealtime } from "@/lib/realtime/RealtimeProvider";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -25,6 +28,15 @@ const nav = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { status, search } = useRealtime();
+  const [q, setQ] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const onSearch = (v: string) => {
+    setQ(v);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => search(v), 250);
+  };
 
   return (
     <div className="flex min-h-screen">
@@ -78,6 +90,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-surface/60 px-3 py-2 text-sm text-muted">
             <Search size={16} />
             <input
+              value={q}
+              onChange={(e) => onSearch(e.target.value)}
               placeholder="Buscar ofertas, anunciantes, ângulos…"
               className="w-full bg-transparent text-text outline-none placeholder:text-muted"
               aria-label="Busca global"
@@ -86,6 +100,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Command size={11} /> K
             </span>
           </div>
+          <LiveBadge status={status} className="hidden sm:inline-flex" />
           <button className="relative grid h-9 w-9 place-items-center rounded-lg border border-border bg-surface/60 text-muted hover:text-text" aria-label="Notificações">
             <Bell size={17} />
             <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent" />

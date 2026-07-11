@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Logo } from "./illustrations/Logo";
+import Logo from "./illustrations/Logo";
 
 const cols = [
   {

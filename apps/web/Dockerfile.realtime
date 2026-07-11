@@ -1,0 +1,12 @@
+# SpyFy Realtime Radar — WebSocket server (zero deps, Node built-ins)
+FROM node:20-alpine
+
+WORKDIR /app
+COPY server/realtime.js server/dev.js ./
+
+EXPOSE 4000
+ENV PORT=4000
+ENV REALTIME_SIMULATE=true
+ENV REALTIME_TOKEN=""
+
+CMD ["node", "realtime.js"]
