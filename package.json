@@ -5,5 +5,8 @@
   "description": "SpyFy monorepo root. The Next.js app lives in apps/web; this root package.json exists so Vercel's framework detection (run at the project Root Directory '.') finds 'next'. The actual build/install commands are overridden in vercel.json to run inside apps/web.",
   "dependencies": {
     "next": "^15.5.20"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   }
 }
