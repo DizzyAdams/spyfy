@@ -1,16 +1,17 @@
 """
-SpyFy — Meta Ad Library integration (REAL)
-=========================================
-Busca de anúncios ativos do Facebook/Instagram via Meta Ad Library (fonte
-pública oficial de transparência). Dois modos, em ordem de preferência:
+SpyFy — Google Ads Transparency Center integration (REAL)
+==========================================================
+Busca de anúncios do Google Ads Transparency Center (fonte pública oficial
+de transparência de anúncios do Google). Não existe API pública estável, então
+a coleta é feita por web-scrape de https://adstransparency.google.com usando
+httpx + html.parser (stdlib, zero novas deps).
 
-1. Ad Library API (graph.facebook.com/v19.0/ads_archive) quando um
-   ``access_token`` é informado — estável, legal, barato.
-2. Web scrape da Ad Library (facebook.com/ads/library) como fallback sem
-   token, usando httpx + html.parser (stdlib, zero novas deps).
-
-Ambos retornam dicts no formato ``Offer`` consumido pelo Radar
+Retorna dicts no formato ``Offer`` consumido pelo Radar
 (apps/web/server/realtime.js -> normalizeOffer). Contrato em lib/data.ts.
+
+Espelha a interface de ``spyfy.meta_library.MetaAdLibrary``. Quando o scrape
+não encontra cards (página client-rendered / bloqueio), levanta
+``GoogleTransparencyError`` e o caller faz fallback para o simulador.
 """
 
 from __future__ import annotations
@@ -26,16 +27,14 @@ import httpx
 
 from .realtime_producer import GRADIENTS
 
-AD_LIBRARY_WEB = "https://www.facebook.com/ads/library/"
-AD_ARCHIVE_API = "https://graph.facebook.com/v19.0/ads_archive"
+AD_TRANSPARENCY_WEB = "https://adstransparency.google.com/"
 
 _MEDIA_TO_FORMAT = {
     "VIDEO": "video",
     "IMAGE": "image",
-    "CAROUSEL": "carousel",
-    "MEMORY": "carousel",
-    "LINK": "image",
-    "ALL": "image",
+    "TEXT": "image",
+    "RESPONSIVE": "image",
+    "HTML": "image",
 }
 
 _HEADERS = {
@@ -48,8 +47,8 @@ _HEADERS = {
 }
 
 
-class MetaScrapeError(RuntimeError):
-    """Levantado quando nem a API nem o web-scrape retornam dados."""
+class GoogleTransparencyError(RuntimeError):
+    """Levantado quando o web-scrape não retorna dados."""
 
 
 def _now() -> datetime:
@@ -83,8 +82,8 @@ def _parse_impressions(value: Any) -> int:
     if value is None:
         return 0
     if isinstance(value, dict):
-        lo = _to_int(value.get("lower_bound"))
-        hi = _to_int(value.get("upper_bound"))
+        lo = _to_int(value.get("lower_bound") or value.get("min"))
+        hi = _to_int(value.get("upper_bound") or value.get("max"))
         if lo and hi:
             return (lo + hi) // 2
         return lo or hi or 0
@@ -96,7 +95,9 @@ def _hue_from_id(uid: str) -> int:
 
 
 def _infer_format(node: dict[str, Any]) -> str:
-    mt = str(node.get("mediaType") or node.get("media_type") or "").upper()
+    mt = str(
+        node.get("format") or node.get("adFormat") or node.get("mediaType") or ""
+    ).upper()
     if mt in _MEDIA_TO_FORMAT:
         return _MEDIA_TO_FORMAT[mt]
     if any("video" in k.lower() for k in node):
@@ -115,24 +116,22 @@ def _compute_score(longevity_days: int, impressions: int, has_video: bool) -> fl
 
 def _bullets_from_body(body: str, n: int = 3) -> list[str]:
     if not body:
-        return ["Criativo coletado da Meta Ad Library"]
+        return ["Criativo coletado do Google Ads Transparency"]
     parts = re.split(r"(?<=[\.!?])\s+", body.strip())
     out = [p.strip() for p in parts if p.strip()]
     return out[:n] if out else [body[:120]]
 
 
-class MetaAdLibrary:
-    """Cliente de busca de anúncios do Meta Ad Library (API ou web)."""
+class GoogleAdsTransparency:
+    """Cliente de busca do Google Ads Transparency Center (web-scrape)."""
 
     def __init__(
         self,
-        access_token: str = "",
         country: str = "BR",
         timeout: float = 20.0,
         client: httpx.Client | None = None,
         proxies: str | dict | None = None,
     ) -> None:
-        self.access_token = access_token or ""
         self.country = country
         self.timeout = timeout
         self._client = client
@@ -158,70 +157,7 @@ class MetaAdLibrary:
     ) -> list[dict]:
         """Retorna até ``limit`` ofertas (formato Offer) para ``query``."""
         country = country or self.country
-        media_types = tuple(media_types) or ("all",)
-
-        if self.access_token:
-            try:
-                return self._search_api(query, limit, country, media_types)
-            except MetaScrapeError:
-                raise
-            except Exception:  # noqa: BLE001 - fallback explícito p/ web
-                pass
-
-        return self._search_web(query, limit, country, media_types)
-
-    def _search_api(
-        self,
-        query: str,
-        limit: int,
-        country: str,
-        media_types: tuple[str, ...],
-    ) -> list[dict]:
-        params = {
-            "access_token": self.access_token,
-            "search_terms": query,
-            "ad_reached_countries": json.dumps([country]),
-            "ad_active_status": "ACTIVE",
-            "media_types": ",".join(media_types),
-            "fields": ",".join(
-                [
-                    "id",
-                    "ad_archive_id",
-                    "page_id",
-                    "page_name",
-                    "ad_creative_bodies",
-                    "ad_creative_link_titles",
-                    "ad_delivery_start_time",
-                    "ad_delivery_country",
-                    "impressions",
-                    "spend",
-                    "currency",
-                    "publisher_platforms",
-                    "snapshot_url",
-                    "ad_snapshot_url",
-                ]
-            ),
-            "limit": str(min(limit, 100)),
-        }
-        out: list[dict] = []
-        url: str | None = AD_ARCHIVE_API
-        while url and len(out) < limit:
-            resp = self.client.get(
-                url, params=params if url == AD_ARCHIVE_API else None
-            )
-            if resp.status_code != 200:
-                raise MetaScrapeError(
-                    f"Ad Library API {resp.status_code}: {resp.text[:200]}"
-                )
-            payload = resp.json()
-            for row in payload.get("data", []):
-                offer = self._api_to_offer(row)
-                if offer:
-                    out.append(offer)
-            url = (payload.get("paging") or {}).get("next")
-        return out[:limit]
-
-
+        return self._search_web(query, limit, country, tuple(media_types) or ("all",))
 
     def _search_web(
         self,
@@ -231,32 +167,29 @@ class MetaAdLibrary:
         media_types: tuple[str, ...],
     ) -> list[dict]:
         params = {
-            "active_status": "ACTIVE",
-            "ad_type": "all",
-            "country": country,
-            "q": query,
-            "media_types": media_types[0] if media_types else "all",
+            "region": country.upper(),
+            "query": query,
+            "media_type": media_types[0] if media_types else "all",
         }
-        url = f"{AD_LIBRARY_WEB}?{urlencode(params)}"
+        url = f"{AD_TRANSPARENCY_WEB}?{urlencode(params)}"
         resp = self.client.get(url)
         if resp.status_code != 200:
-            raise MetaScrapeError(
-                f"Ad Library web {resp.status_code} para {query!r}"
+            raise GoogleTransparencyError(
+                f"Google Transparency web {resp.status_code} para {query!r}"
             )
         offers = self.parse_html(resp.text, limit=limit)
         if not offers:
-            raise MetaScrapeError(
-                f"Ad Library web sem cards extraídos para {query!r} "
-                f"(possível login wall / bloqueio de região)"
+            raise GoogleTransparencyError(
+                f"Google Transparency web sem cards extraídos para {query!r} "
+                f"(página client-rendered / bloqueio de região)"
             )
         return offers
 
     def parse_html(self, html_text: str, limit: int = 20) -> list[dict]:
-        """Extrai ofertas do HTML da Ad Library (JSON embarcado + fallback)."""
+        """Extrai ofertas do HTML do Transparency Center (JSON + fallback)."""
         offers: list[dict] = []
         seen: set[str] = set()
 
-        # 1) Blob JSON em <script type="application/json"> (formato FB)
         for blob in re.findall(
             r"<script[^>]*type=[\"']application/json[\"'][^>]*>(.*?)</script>",
             html_text,
@@ -274,9 +207,10 @@ class MetaAdLibrary:
                 if len(offers) >= limit:
                     return offers[:limit]
 
-        # 2) Fallback: regex direto sobre o HTML
         if not offers:
-            for m in re.finditer(r'"adArchiveId"\s*:\s*"([^"]+)"', html_text):
+            for m in re.finditer(
+                r'"(?:creativeId|adId)"\s*:\s*"([^"]+)"', html_text
+            ):
                 aid = m.group(1)
                 if aid in seen:
                     continue
@@ -292,7 +226,9 @@ class MetaAdLibrary:
 
     def _iter_ad_nodes(self, node: Any):
         if isinstance(node, dict):
-            if "adArchiveId" in node and isinstance(node.get("adArchiveId"), str):
+            if "creativeId" in node and isinstance(node.get("creativeId"), str):
+                yield node
+            elif "adId" in node and isinstance(node.get("adId"), str):
                 yield node
             for v in node.values():
                 yield from self._iter_ad_nodes(v)
@@ -303,8 +239,14 @@ class MetaAdLibrary:
     def _regex_node(self, html_text: str, aid: str) -> dict:
         idx = html_text.find(aid)
         window = html_text[max(0, idx - 600) : idx + 600]
-        node: dict[str, Any] = {"adArchiveId": aid}
-        for key in ("pageName", "body", "snapshotUrl", "startDate", "mediaType"):
+        node: dict[str, Any] = {"creativeId": aid}
+        for key in (
+            "advertiserName",
+            "adText",
+            "landingPage",
+            "startDate",
+            "format",
+        ):
             m = re.search(rf'"{key}"\s*:\s*"((?:[^"\\]|\\.)*)"', window)
             if m:
                 raw = m.group(1)
@@ -317,60 +259,41 @@ class MetaAdLibrary:
 
 
 
-    def _api_to_offer(self, d: dict[str, Any]) -> dict | None:
-        aid = str(d.get("ad_archive_id") or d.get("id") or "")
+    def _web_node_to_offer(self, d: dict[str, Any]) -> dict | None:
+        if not isinstance(d, dict):
+            return None
+        aid = str(
+            d.get("creativeId") or d.get("adId") or d.get("id") or ""
+        )
         if not aid:
             return None
-        page = d.get("page_name") or "Anunciante"
-        bodies = d.get("ad_creative_bodies") or []
-        body = " ".join(b for b in bodies if isinstance(b, str))
-        titles = d.get("ad_creative_link_titles") or []
-        headline = (titles[0] if titles else (body.split(".")[0] if body else "")) or "Oferta"
-        start = _parse_dt(d.get("ad_delivery_start_time") or d.get("startDate"))
+        page = (
+            d.get("advertiserName")
+            or d.get("advertiser_name")
+            or d.get("brand")
+            or "Anunciante"
+        )
+        body = d.get("adText") or d.get("body") or d.get("headline") or ""
+        if isinstance(body, list):
+            body = " ".join(x for x in body if isinstance(x, str))
+        titles = d.get("headline") or d.get("adTitle") or ""
+        headline = (titles or (body.split(".")[0] if body else "")) or "Oferta"
+        start = _parse_dt(d.get("startDate") or d.get("firstShown") or d.get("runDate"))
         impr = _parse_impressions(d.get("impressions"))
-        country = str(d.get("ad_delivery_country") or self.country or "BR")
+        country = str(d.get("region") or d.get("country") or self.country or "BR")
         fmt = _infer_format(d)
         return self._finalize(
             uid=aid,
             headline=headline,
             advertiser=page,
             country=country,
-            body=body,
-            fmt=fmt,
-            start=start,
-            impr=impr,
-            snapshot=d.get("snapshot_url") or d.get("ad_snapshot_url") or "",
-        )
-
-    def _web_node_to_offer(self, d: dict[str, Any]) -> dict | None:
-        if not isinstance(d, dict):
-            return None
-        aid = str(d.get("adArchiveId") or d.get("ad_archive_id") or "")
-        if not aid:
-            return None
-        page = d.get("pageName") or d.get("page_name") or "Anunciante"
-        body = d.get("body") or d.get("adCreativeBody") or ""
-        if isinstance(body, list):
-            body = " ".join(x for x in body if isinstance(x, str))
-        titles = d.get("adCreativeLinkTitle") or d.get("linkTitle") or ""
-        headline = (titles or (body.split(".")[0] if body else "")) or "Oferta"
-        start = _parse_dt(
-            d.get("startDate") or d.get("adDeliveryStartTime") or d.get("startDate")
-        )
-        impr = _parse_impressions(d.get("impressions"))
-        fmt = _infer_format(d)
-        return self._finalize(
-            uid=aid,
-            headline=headline,
-            advertiser=page,
-            country=self.country or "BR",
             body=str(body),
             fmt=fmt,
             start=start,
             impr=impr,
-            snapshot=d.get("snapshotUrl")
-            or d.get("snapshot_url")
+            snapshot=d.get("landingPage")
             or d.get("url")
+            or d.get("adUrl")
             or "",
         )
 
@@ -395,10 +318,10 @@ class MetaAdLibrary:
         bullets = _bullets_from_body(body)
         cta = "Ver anúncio" if snapshot else "Ver oferta"
         return {
-            "id": f"meta_{uid}",
-            "headline": headline.strip()[:160] or "Oferta do Meta Ad Library",
+            "id": f"google_{uid}",
+            "headline": headline.strip()[:160] or "Oferta do Google Transparency",
             "advertiser": str(advertiser)[:60],
-            "network": "meta",
+            "network": "google",
             "format": fmt,
             "niche": "",
             "longevityDays": longevity,
@@ -407,7 +330,7 @@ class MetaAdLibrary:
             "country": country,
             "thumbnailHue": _hue_from_id(uid),
             "gradient": GRADIENTS[hash(uid) % len(GRADIENTS)],
-            "bullets": bullets or ["Criativo coletado da Meta Ad Library"],
+            "bullets": bullets or ["Criativo coletado do Google Ads Transparency"],
             "cta": cta,
             "funnel": [
                 {"type": "lp", "label": "Landing Page"},
@@ -416,9 +339,9 @@ class MetaAdLibrary:
             "vslSeconds": 0,
             "transcript": [],
             "snapshotUrl": snapshot,
-            "source": "meta_ad_library",
+            "source": "google_ads_transparency",
         }
 
 
-__all__ = ["MetaAdLibrary", "MetaScrapeError"]
+__all__ = ["GoogleAdsTransparency", "GoogleTransparencyError"]
 

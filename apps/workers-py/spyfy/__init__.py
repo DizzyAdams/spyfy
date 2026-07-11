@@ -25,6 +25,8 @@ from .digest import (FeedOffer, UserFeedPrefs, rank_feed, build_digest,
 from .radar import (RadarQuery, RadarOffer, run_radar, win_probability,
                     early_mover_bonus, radar_report, should_alert)
 from .meta_library import MetaAdLibrary, MetaScrapeError
+from .tiktok_library import TikTokAdLibrary, TikTokScrapeError
+from .google_library import GoogleAdsTransparency, GoogleTransparencyError
 
 
 __all__ = ["AdSignals", "NicheEconomics", "ScoreWeights", "OfferEstimate",
@@ -51,6 +53,8 @@ __all__ = ["AdSignals", "NicheEconomics", "ScoreWeights", "OfferEstimate",
            "build_digest", "optimal_send_hour",
            "RadarQuery", "RadarOffer", "run_radar", "win_probability",
            "MetaAdLibrary", "MetaScrapeError",
+           "TikTokAdLibrary", "TikTokScrapeError",
+           "GoogleAdsTransparency", "GoogleTransparencyError",
 
            "early_mover_bonus", "radar_report", "should_alert"]
 __version__ = "0.1.0"

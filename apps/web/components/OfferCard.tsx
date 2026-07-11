@@ -13,7 +13,7 @@ import {
   Gauge,
 } from "lucide-react";
 import { Offer, NETWORKS } from "@/lib/data";
-import { scoreBand, formatNumber, cn } from "@/lib/utils";
+import { scoreBand, formatNumber, scaleIndex, spendBand, cn } from "@/lib/utils";
 import { cardHover, EXPOCSS } from "@/lib/motion";
 import { OfferCreative } from "./OfferCreative";
 
@@ -38,6 +38,9 @@ export function OfferCard({
   const Icon = bandIcon[band.key];
   const net = NETWORKS.find((n) => n.key === offer.network);
   const href = `/app/offer/${offer.id}`;
+  // Índice de escala + faixa de gasto diário — derivados 100% no cliente.
+  const scale = scaleIndex(offer);
+  const spend = spendBand(offer.estImpressions, offer.longevityDays);
 
   // Entrance reveal + magnetic-style lift (honors reduced-motion).
   const cardVariants = {
@@ -87,6 +90,7 @@ export function OfferCard({
               gradient={offer.gradient}
               label={offer.headline}
               format={offer.format}
+              image={offer.image}
               className="aspect-[5/3] w-full"
             />
           </Link>
@@ -121,26 +125,46 @@ export function OfferCard({
           </Link>
 
           {/* Scale score (mono) + longevity days */}
-          <div className="mt-auto flex items-end justify-between gap-3">
-            <div className="flex flex-col gap-0.5">
-              <span className="flex items-center gap-1 font-mono text-lg font-semibold leading-none text-text tabular-nums">
-                <Gauge size={13} className="text-[var(--violet-soft)]" aria-hidden />
-                {formatNumber(offer.estImpressions)}
-              </span>
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-faint">
-                impressões · escala
-              </span>
+          <div className="mt-auto flex flex-col gap-2">
+            <div className="flex items-end justify-between gap-3">
+              <div className="flex flex-col gap-0.5">
+                <span className="flex items-center gap-1 font-mono text-lg font-semibold leading-none text-text tabular-nums">
+                  <Gauge size={13} className="text-[var(--violet-soft)]" aria-hidden />
+                  {formatNumber(offer.estImpressions)}
+                </span>
+                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-faint">
+                  impressões · escala
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted">
+                <CalendarDays size={13} className="text-[var(--muted)]" aria-hidden />
+                <span className="font-mono tabular-nums text-text">{offer.longevityDays}d</span>
+                ativa
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-muted">
-              <CalendarDays size={13} className="text-[var(--muted)]" aria-hidden />
-              <span className="font-mono tabular-nums text-text">{offer.longevityDays}d</span>
-              ativa
+
+            {/* Índice de Escala (chip violet-soft) + estimativa de gasto diário */}
+            <div className="flex items-center justify-between gap-3">
+              <span
+                className="chip"
+                style={{
+                  color: "var(--violet-soft)",
+                  borderColor: "rgba(167, 139, 250, 0.35)",
+                  background: "rgba(167, 139, 250, 0.12)",
+                }}
+              >
+                <Gauge size={12} aria-hidden />
+                Escala {scale}
+              </span>
+              <span className="font-mono text-[11px] text-faint tabular-nums">
+                ~R${formatNumber(spend.daily)}/dia · {spend.label}
+              </span>
             </div>
           </div>
 
           {/* Quick actions */}
           <div className="flex items-center gap-2 pt-1">
-            <Link href={href} className="btn btn-primary flex-1 !justify-center !py-2 !text-[13px]">
+            <Link href={href} className="btn btn-primary flex-1 !justify-center !py-2 !text-[13px] focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]">
               <Copy size={14} aria-hidden />
               Clonar
             </Link>

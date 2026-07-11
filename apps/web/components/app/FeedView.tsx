@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { SlidersHorizontal, Activity, Users, Layers } from "lucide-react";
-import { NETWORKS, type Network } from "@/lib/data";
+import { SlidersHorizontal, Activity, Users, Layers, WifiOff } from "lucide-react";
+import { NETWORKS, type Network, type Offer } from "@/lib/data";
 import { OfferCard } from "../OfferCard";
 import { LiveBadge } from "./LiveBadge";
 import { cn } from "@/lib/utils";
@@ -21,8 +21,33 @@ const niches = [
 
 const countries = ["all", "BR", "US", "PT", "MX", "AR", "CO"];
 
-function LiveTicker({ text, reduce }: { text: string; reduce: boolean | null }) {
+// Friendly network label for the ticker (falls back to the raw key).
+function networkLabel(key: Network): string {
+  return NETWORKS.find((n) => n.key === key)?.label ?? key;
+}
+
+function LiveTicker({ recent, reduce }: { recent: Offer[]; reduce: boolean | null }) {
+  const [idx, setIdx] = useState(0);
+
+  // Rotate through the latest few offers (~3.5s). Under reduced motion we
+  // freeze to the most recent offer (index 0) and never start the interval.
+  useEffect(() => {
+    if (reduce || recent.length <= 1) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % recent.length), 3500);
+    return () => clearInterval(t);
+  }, [reduce, recent.length]);
+
+  // Keep the cursor in range as the recent list grows/shrinks.
+  useEffect(() => {
+    setIdx((i) => Math.min(i, Math.max(recent.length - 1, 0)));
+  }, [recent.length]);
+
+  const current = recent[reduce ? 0 : idx] ?? recent[0];
+  const text = current
+    ? `${current.headline} · ${networkLabel(current.network)} · ${Math.round(current.winningScore)}`
+    : "";
   if (!text) return null;
+
   return (
     <div className="relative flex-1 overflow-hidden rounded-full border border-border bg-surface/50 px-3 py-1.5">
       <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-[10px] font-bold uppercase tracking-widest text-accent">
@@ -47,11 +72,85 @@ function LiveTicker({ text, reduce }: { text: string; reduce: boolean | null }) 
   );
 }
 
+// First-load placeholder that mirrors the OfferCard silhouette (rounded-2xl
+// surface, aspect-[5/3] creative block, a couple of text lines). The shimmer
+// is gated behind prefers-reduced-motion: when reduced we render static muted
+// blocks with no pulse.
+function SkeletonCard({ reduce }: { reduce: boolean | null }) {
+  return (
+    <div className="surface bento relative flex flex-col overflow-hidden rounded-2xl border border-border">
+      <div
+        aria-hidden
+        className={cn(
+          "aspect-[5/3] w-full rounded-t-2xl bg-border/40",
+          !reduce && "animate-pulse"
+        )}
+      />
+      <div className="flex flex-col gap-3 p-4">
+        <div className="flex gap-2">
+          <div className={cn("h-5 w-16 rounded-full bg-border/40", !reduce && "animate-pulse")} />
+          <div className={cn("h-5 w-20 rounded-full bg-border/40", !reduce && "animate-pulse")} />
+        </div>
+        <div className={cn("h-4 w-3/4 rounded bg-border/40", !reduce && "animate-pulse")} />
+        <div className={cn("h-4 w-1/2 rounded bg-border/40", !reduce && "animate-pulse")} />
+        <div className="mt-auto flex items-center justify-between pt-2">
+          <div className={cn("h-8 w-24 rounded bg-border/40", !reduce && "animate-pulse")} />
+          <div className={cn("h-8 w-8 rounded bg-border/40", !reduce && "animate-pulse")} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// On-brand notice shown when the realtime layer is offline. Cached offers stay
+// visible beneath it (per the banner copy), so this is purely a status affordance.
+function OfflineBanner({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="mb-6 flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface/60 px-6 py-10 text-center"
+    >
+      <span className="grid h-12 w-12 place-items-center rounded-full border border-border bg-surface text-muted">
+        <WifiOff size={22} aria-hidden />
+      </span>
+      <div>
+        <p className="font-display text-base font-semibold text-text">
+          Radar offline — mostrando ofertas em cache
+        </p>
+        <p className="mt-1 text-sm text-muted">
+          Não foi possível conectar ao servidor de tempo real. Verifique a conexão e tente de novo.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="btn btn-primary focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+      >
+        Tentar de novo
+      </button>
+    </div>
+  );
+}
+
 export function FeedView() {
-  const { status, offers, stats, filters, query, newIds, setFilters, search } =
+  const { status, offers, stats, filters, query, newIds, setFilters, search, loadedOnce } =
     useRealtime();
   const [sort, setSort] = useState<"score" | "longevity">("score");
   const reduce = useReducedMotion();
+
+  // First-load skeletons show only during the initial connecting phase (before
+  // the realtime layer confirms a live feed or goes offline).
+  const showSkeletons = status === "connecting" && !loadedOnce;
+  const isOffline = status === "offline";
+
+  // Re-send the active subscription/search so the socket path re-opens.
+  const reconnect = useCallback(() => {
+    if (query.trim()) search(query);
+    else setFilters(filters);
+  }, [query, search, setFilters, filters]);
+
+  // The 4 most recent offers drive the rotating live signal (offers[0] is newest).
+  const recent = useMemo(() => offers.slice(0, 4), [offers]);
 
   const results = useMemo(() => {
     let r = offers.filter((o) =>
@@ -89,21 +188,29 @@ export function FeedView() {
             </span>
           </p>
         </div>
-        <LiveBadge status={status} />
+        <LiveBadge
+          status={status}
+          perMin={stats?.perMin}
+          uptimeSec={stats?.uptimeSec}
+        />
       </div>
 
       {/* Live stats + ticker */}
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <LiveTicker text={offers[0]?.headline ?? ""} reduce={reduce} />
+        <LiveTicker recent={recent} reduce={reduce} />
         <div className="flex flex-wrap items-center gap-2">
-          <span className="chip !text-accent" title="Ofertas mineradas por minuto">
-            <Activity size={13} /> {stats?.perMin ?? 0}/min
+          {/* Real values, falling back to the cached offer count when stats is null. */}
+          <span className="chip !text-accent" title="Ofertas mineradas no total">
+            <Layers size={13} /> {formatCount(stats?.totalMined ?? offers.length)}{" "}
+            <span className="text-muted">Mineradas</span>
           </span>
-          <span className="chip" title="Total indexado pelo Radar">
-            <Layers size={13} /> {formatCount(stats?.totalMined ?? 0)}
+          <span className="chip" title="Ofertas mineradas por minuto">
+            <Activity size={13} /> {stats?.perMin ?? offers.length}{" "}
+            <span className="text-muted">Minuto</span>
           </span>
           <span className="chip" title="Conexões ativas no Radar">
-            <Users size={13} /> {stats?.connections ?? 0} online
+            <Users size={13} /> {stats?.connections ?? offers.length}{" "}
+            <span className="text-muted">Conexões</span>
           </span>
         </div>
       </div>
@@ -116,7 +223,7 @@ export function FeedView() {
           </span>
           <button
             onClick={() => setFilters({ network: "all" })}
-            className={cn("chip cursor-pointer", filters.network === "all" && "!text-text !border-primary/50")}
+            className={cn("chip min-h-[44px] cursor-pointer", filters.network === "all" && "!text-text !border-primary/50")}
           >
             Todas
           </button>
@@ -124,7 +231,7 @@ export function FeedView() {
             <button
               key={n.key}
               onClick={() => setFilters({ network: n.key })}
-              className={cn("chip cursor-pointer", filters.network === n.key && "!text-text !border-primary/50")}
+              className={cn("chip min-h-[44px] cursor-pointer", filters.network === n.key && "!text-text !border-primary/50")}
               style={{ color: filters.network === n.key ? n.color : undefined }}
             >
               {n.label}
@@ -136,7 +243,7 @@ export function FeedView() {
           <select
             value={filters.niche}
             onChange={(e) => setFilters({ niche: e.target.value })}
-            className="rounded-full border border-border bg-surface/60 px-3 py-1 text-xs text-text outline-none"
+            className="min-h-[44px] rounded-full border border-border bg-surface/60 px-3 py-1 text-xs text-text outline-none"
             aria-label="Nicho"
           >
             {niches.map((n) => (
@@ -149,7 +256,7 @@ export function FeedView() {
           <select
             value={filters.country}
             onChange={(e) => setFilters({ country: e.target.value })}
-            className="rounded-full border border-border bg-surface/60 px-3 py-1 text-xs text-text outline-none"
+            className="min-h-[44px] rounded-full border border-border bg-surface/60 px-3 py-1 text-xs text-text outline-none"
             aria-label="País"
           >
             {countries.map((c) => (
@@ -162,7 +269,7 @@ export function FeedView() {
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as "score" | "longevity")}
-            className="rounded-full border border-border bg-surface/60 px-3 py-1 text-xs text-text outline-none"
+            className="min-h-[44px] rounded-full border border-border bg-surface/60 px-3 py-1 text-xs text-text outline-none"
             aria-label="Ordenar por"
           >
             <option value="score">Winning score</option>
@@ -171,27 +278,40 @@ export function FeedView() {
         </div>
       </div>
 
-      <motion.div layout className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <AnimatePresence mode="popLayout">
-          {results.map((o, i) => (
-            <OfferCard key={o.id} offer={o} index={i} isNew={newIds.has(o.id)} />
-          ))}
-        </AnimatePresence>
-      </motion.div>
+      {isOffline && <OfflineBanner onRetry={reconnect} />}
 
-      {results.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border p-12 text-center text-muted">
-          Nenhuma oferta para esses filtros.{" "}
-          <button
-            onClick={() => {
-              setFilters({ network: "all", niche: "Todos", country: "all" });
-              search("");
-            }}
-            className="ml-1 text-primary underline"
-          >
-            Limpar filtros
-          </button>
+      {showSkeletons ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonCard key={i} reduce={reduce} />
+          ))}
         </div>
+      ) : (
+        <>
+          <motion.div layout className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <AnimatePresence mode="popLayout">
+              {results.map((o, i) => (
+                <OfferCard key={o.id} offer={o} index={i} isNew={newIds.has(o.id)} />
+              ))}
+            </AnimatePresence>
+          </motion.div>
+
+          {results.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-border p-12 text-center text-muted">
+              Nenhuma oferta para esses filtros. Ajuste rede, nicho ou país para ver mais
+              vencedoras.{" "}
+              <button
+                onClick={() => {
+                  setFilters({ network: "all", niche: "Todos", country: "all" });
+                  search("");
+                }}
+                className="ml-1 text-primary underline"
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

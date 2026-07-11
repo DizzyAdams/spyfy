@@ -231,3 +231,77 @@ conectar o repositório `DizzyAdams/spyfy` no Dashboard do projeto, ou rodar
 `vercel link` (que reconecta o GitHub via OAuth no browser). Deploy manual continua
 funcionando: `vercel --prod --yes` (a partir da raiz do repo).
 
+## 🤖 Auditoria Autônoma (swarm) — Visualizador de Ofertas + Campanhas Validadas
+
+**Data:** 11/07/2026 · **Rodada:** 3 agentes autônomos em paralelo
+(frontend / backend / baseline-verde), refletindo a **working tree** (não o
+último commit — há 11 modificados + 4 untracked).
+
+### Escopo
+- **Visualizador de ofertas (frontend):** `OfferCard`, `OfferCreative`, `FeedView`,
+  `LiveBadge`, `RealtimeProvider`, `miner.ts`, `server/realtime.js`, `lib/data.ts`,
+  `lib/utils.ts`.
+- **Campanhas validadas (backend):** `meta_library.py`, `tiktok_library.py`,
+  `google_library.py`, `scraper_bridge.py` — busca **real** nas Ad Libraries
+  (Meta/TikTok/Google) mapeada para o contrato `Offer`, com fallback ao simulador.
+
+### Baseline antes da correção — 🔴 BACKEND VERMELHO
+| Camada | Estado | Motivo |
+|--------|--------|--------|
+| Frontend Next.js | 🟢 VERDE | `next build` OK (16 rotas), `npm audit` 0 vulns |
+| Backend Python | 🔴 VERMELHO | `pytest` **1 failed** (teste novo do TikTok) + `NameError` em `scraper_bridge.py` + 8 erros `mypy`/`ruff` |
+| Deps (prod) | 🟢 | Frontend 0 vulns; `httpx 0.27` OK; `pip-audit` não concluído (timeout) |
+
+### Correções aplicadas (voltou a 🟢 VERDE)
+1. **C1 — Meta API real morta (CRÍTICO):** `meta_library.py:210` passava
+   `params=None` sempre → a chamada `GET ads_archive` sem `access_token` retornava
+   400 → fallback silencioso ao simulador. Agora `params=params if url == AD_ARCHIVE_API`.
+2. **H2 — Corrupção UTF-8 no regex (ALTO):** `_regex_node` fazia
+   `m.group(1).encode().decode("unicode_escape")` → mojibake + *soft-hyphen*
+   (`\xad`) em headlines PT-BR (ex.: `Cílios` → `Cí\xadlios`). Trocado por
+   `json.loads(f'"{raw}"')` com fallback, nas 3 libs (meta/tiktok/google). **Corrige
+   o teste que falhava.**
+3. **`scraper_bridge.build_offer` — `NameError` + dead code:** bloco de
+   "campos derivados" (scaleIndex/spendPerDay) estava após `return {` → inatingível
+   e com `offer` indefinido (erro `mypy`). Passou a `offer: dict[str, Any] = {`
+   (import de `Any` adicionado) para o bloco rodar e `return offer` funcionar.
+4. **Tipo de `params` (TikTok/Meta):** valores `int` em `params` quebravam
+   `mypy` (`Client.get`). `limit`/`page_size` agora como `str` e `params: dict[str, str]`.
+
+### Validação pós-correção ✅
+```
+cd apps/workers-py
+python -m pytest -q      # 106 passed  (era 1 failed)
+python -m mypy spyfy     # Success: no issues found in 25 source files
+python -m ruff check spyfy tests   # All checks passed!
+```
+
+### Backlog identificado (NÃO corrigido nesta rodada — apenas auditado)
+**Backend (prioridade média/baixa):**
+- `niche` sempre `""` em `_finalize` das 3 libs (mitigado no servidor → `"Geral"`).
+- `httpx.Client` nunca é `.close()`-ado → vazamento em `run_loop` longo (M5).
+- `except Exception` silencioso em `mine()` sem log → falhas de scrape invisíveis (M6).
+- `build_offer` omite `thumbnailHue`/`transcript` (contrato exigia; servidor preenche).
+- `google_library.py` **sem teste unitário**; TikTok/Google libraries **untracked** (fora de CI).
+- Secrets default (`docker-compose.yml`, `scripts/*`) fora dos módulos auditados.
+
+**Frontend (HIGH/MEDIUM/LOW — qualidade/UX/a11y):**
+- **H1:** chips de telemetria usam `?? offers.length` (seed=60) como fallback →
+  mostram "60 conexões/minuto" falsos quando `stats` é `null` (comum em prod/Vercel).
+- **H2:** `lib/realtime/miner.ts` é **dead code** (Route Handler SSE nunca criado);
+  diverge do `server/realtime.js` (não seta scaleIndex/spendPerDay). Unificar a fonte.
+- **M1:** filtros de rede sem `aria-pressed`. **M2:** `LiveBadge` `aria-live` anuncia
+  a cada ~5s (ruído). **M3:** botão "Salvar oferta" é no-op (sem `onClick`).
+- **L1:** `carousel` não tem cor distinta em `data.ts`. **L2:** `scaleIndex` recalcula
+  com cap diferente do servidor. **L6:** rede/país desconhecidos quebram o chip
+  (defender contra `VALID_NETWORKS` também no cliente). **L5:** sem seeds p/ MX/AR/CO.
+
+### Status por camada (ao fim da rodada)
+| Camada | Estado |
+|--------|--------|
+| Backend Python | 🟢 VERDE (106 passed · mypy 0 · ruff 0) |
+| Frontend Next.js | 🟢 VERDE (build OK · 0 vulns prod) |
+| Visualizador de Ofertas | 🟢 funcional · backlog a11y/UX documentado |
+| Campanhas Validadas (Ad Libraries) | 🟢 real Meta/TikTok/Google ativas · fallback intacto |
+
+

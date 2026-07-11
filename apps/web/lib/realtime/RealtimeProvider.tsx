@@ -34,6 +34,7 @@ interface RealtimeContextValue {
   newIds: Set<string>;
   setFilters: (f: Partial<RealtimeFilters>) => void;
   search: (q: string) => void;
+  loadedOnce: boolean;
 }
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
@@ -49,6 +50,14 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   });
   const [query, setQuery] = useState("");
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
+
+  // Tracks whether the realtime layer has confirmed a live feed or given up.
+  // The UI uses it to choose between a first-load skeleton and real content.
+  // NOTE: the provider seeds cached offers at mount, so we key this off the
+  // connection status (first `live` or `offline`) rather than `offers.length`,
+  // which is already > 0 from the cache on the very first render.
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const loadedOnceRef = useRef(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const filtersRef = useRef(filters);
@@ -66,6 +75,17 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     queryRef.current = query;
   }, [query]);
+
+  // First-load flag: stays false through the initial connecting phase so the
+  // feed can show skeletons, then latches true once the socket confirms a live
+  // feed or the layer gives up (offline).
+  useEffect(() => {
+    if (loadedOnceRef.current) return;
+    if (status === "live" || status === "offline") {
+      loadedOnceRef.current = true;
+      setLoadedOnce(true);
+    }
+  }, [status]);
 
   /* ===== PROVIDER CONTINUES ===== */
 
@@ -222,7 +242,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
   return (
     <RealtimeContext.Provider
-      value={{ status, offers, stats, filters, query, newIds, setFilters, search }}
+      value={{ status, offers, stats, filters, query, newIds, setFilters, search, loadedOnce }}
     >
       {children}
     </RealtimeContext.Provider>

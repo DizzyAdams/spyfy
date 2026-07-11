@@ -14,11 +14,17 @@ export interface Offer {
   country: string;
   thumbnailHue: number;
   gradient: [string, string];
+  image?: string; // URL of the actual ad creative (photo/video poster)
+  thumb?: string; // thumbnail URL
   bullets: string[];
   cta: string;
   funnel: { type: string; label: string; stack?: string }[];
   vslSeconds: number;
   transcript: { t: string; label: string; text: string }[];
+  /** Derivado (opcional) — índice de escala 0–100; o cliente recalcula via scaleIndex(). */
+  scaleIndex?: number;
+  /** Derivado (opcional) — gasto diário estimado em BRL; o cliente recalcula via spendBand(). */
+  spendPerDay?: number;
 }
 
 export const NETWORKS: { key: Network; label: string; color: string }[] = [

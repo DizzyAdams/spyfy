@@ -17,9 +17,11 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import math
 import random
 import sys
 import time
+from typing import Any
 
 from .realtime_producer import DEFAULT_URL, GRADIENTS, push_bulk
 
@@ -50,7 +52,7 @@ def build_offer(niche: str, network: str, i: int) -> dict:
     headlines = HEADLINES.get(key, HEADLINES["finance"])
     vsl = random.random() > 0.25
     vsl_min = random.randint(5, 15)
-    return {
+    offer: dict[str, Any] = {
         "id": f"scrape_{niche}_{network}_{int(time.time())}_{i}",
         "headline": random.choice(headlines),
         "advertiser": random.choice(ADVERTISERS),
@@ -62,6 +64,8 @@ def build_offer(niche: str, network: str, i: int) -> dict:
         "estImpressions": random.randint(2, 92) * 100_000,
         "format": random.choice(["video", "video", "video", "image", "carousel"]),
         "gradient": random.choice(GRADIENTS),
+        "image": "",
+        "thumb": "",
         "bullets": ["Anglo extraído do scraper", "Funil detectado automaticamente"],
         "cta": "Ver oferta",
         "funnel": [
@@ -73,26 +77,59 @@ def build_offer(niche: str, network: str, i: int) -> dict:
         ],
         "vslSeconds": vsl_min * 60 if vsl else 0,
     }
+    # Campos derivados opcionais (o cliente recalcula; aqui só para realismo do feed).
+    # Índice de Escala (0–100): 0.5*score + 0.3*log10(impr) + 0.2*longevidade.
+    _score_part = offer["winningScore"] / 100.0
+    _imp_part = math.log10(offer["estImpressions"] + 1) / math.log10(10_000_000 + 1)
+    _longev_part = min(offer["longevityDays"], 92) / 92.0
+    offer["scaleIndex"] = round(
+        100 * (0.5 * _score_part + 0.3 * _imp_part + 0.2 * _longev_part), 1
+    )
+    # Gasto diário estimado (BRL) — CPM R$9.
+    offer["spendPerDay"] = round(
+        (offer["estImpressions"] / 1000) * 9 / max(offer["longevityDays"], 1)
+    )
+    return offer
 
 
 def mine(niche: str, network: str, count: int = 1, simulate: bool = False,
           token: str = "", country: str = "BR") -> list[dict]:
-    """Busca REAL no Meta Ad Library quando network=='meta' e não é simulate.
-    Fallback para o gerador estruturado (build_offer) em caso de bloqueio/erro
-    (login wall, sem token válido, rede indisponível)."""
+    """Busca REAL na Ad Library da rede quando não é simulate.
+
+    Suporta ``meta`` (Meta Ad Library), ``tiktok`` (TikTok Ad Library) e
+    ``google`` (Google Ads Transparency Center). Para outras redes ou quando
+    não há token/scrape disponível, cai no gerador estruturado (build_offer).
+    Qualquer bloqueio/erro de rede faz fallback gracioso ao simulador.
+    """
+    if simulate:
+        net = network if network in NETWORKS else random.choice(NETWORKS)
+        return [build_offer(niche, net, i) for i in range(count)]
+
     net = network if network in NETWORKS else random.choice(NETWORKS)
-    if net == "meta" and not simulate:
-        try:
+    try:
+        found: list[dict] = []
+        if net == "meta":
             from .meta_library import MetaAdLibrary
 
-            lib = MetaAdLibrary(access_token=token, country=country)
-            found = lib.search(niche, limit=count)
+            found = MetaAdLibrary(access_token=token, country=country).search(
+                niche, limit=count
+            )
+        elif net == "tiktok":
+            from .tiktok_library import TikTokAdLibrary
+
+            found = TikTokAdLibrary(access_token=token, country=country).search(
+                niche, limit=count
+            )
+        elif net == "google":
+            from .google_library import GoogleAdsTransparency
+
+            found = GoogleAdsTransparency(country=country).search(niche, limit=count)
+        if found:
             for o in found:
                 o["niche"] = niche
-            if found:
-                return found[:count]
-        except Exception:  # noqa: BLE001 - fallback explícito ao simulador
-            pass
+            return found[:count]
+    except Exception:  # noqa: BLE001 - fallback explícito ao simulador
+        pass
     return [build_offer(niche, net, i) for i in range(count)]
 
 

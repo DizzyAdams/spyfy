@@ -11,6 +11,7 @@ type OfferCreativeProps = {
   gradient?: string[];
   label: string;
   format?: string;
+  image?: string; // optional real creative (photo/video poster)
   className?: string;
 };
 
@@ -25,6 +26,7 @@ export function OfferCreative({
   gradient,
   label,
   format,
+  image,
   className = "",
 }: OfferCreativeProps) {
   const reduce = useReducedMotion();
@@ -32,6 +34,7 @@ export function OfferCreative({
     gradient && gradient.length >= 2 ? [gradient[0], gradient[1]] : deriveGradient(hue);
   const isVideo = Boolean(format && /video/i.test(format));
   const Icon = isVideo ? Video : ImageIcon;
+  const hasImage = Boolean(image && image.trim().length > 0);
 
   return (
     <div
@@ -40,12 +43,23 @@ export function OfferCreative({
         className,
       )}
     >
-      {/* Gradient field */}
+      {/* Gradient field — kept as the background fallback */}
       <div
         aria-hidden
         className="absolute inset-0 -z-10"
         style={{ backgroundImage: `linear-gradient(135deg, ${g0}, ${g1})` }}
       />
+      {/* Real creative (photo/video poster) — sits above the gradient,
+          below the chip/play/scrim. Gradient remains as graceful fallback. */}
+      {hasImage && (
+        <img
+          src={image}
+          alt={label}
+          loading="lazy"
+          decoding="async"
+          className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover"
+        />
+      )}
       {/* Volumetric depth — soft top highlight + vignette toward canvas */}
       <div
         aria-hidden
@@ -73,15 +87,18 @@ export function OfferCreative({
         />
       )}
 
-      {/* Format badge — Lucide icon + pt-BR label */}
-      <span className="chip absolute left-3 top-3 z-20 !border-white/15 !bg-black/35 !text-white/90 backdrop-blur-md">
-        <Icon size={12} className="text-accent" />
+      {/* Format badge — Lucide icon + pt-BR label (icon is decorative; label is the signal) */}
+      <span
+        className="chip absolute left-3 top-3 z-20 !border-white/15 !bg-black/35 !text-white/90 backdrop-blur-md"
+        aria-label={`Formato: ${isVideo ? "Vídeo" : "Imagem"}`}
+      >
+        <Icon size={12} className="text-accent" aria-hidden />
         <span className="capitalize">{isVideo ? "Vídeo" : "Imagem"}</span>
       </span>
 
-      {/* Center play affordance for video */}
+      {/* Center play affordance for video — decorative only (poster is already described) */}
       {isVideo && (
-        <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center">
+        <div aria-hidden className="pointer-events-none absolute inset-0 z-10 grid place-items-center">
           <div className="grid h-12 w-12 place-items-center rounded-full border border-white/25 bg-black/30 text-white ring-1 ring-white/15 backdrop-blur-md transition-transform duration-300 group-hover:scale-110 group-hover:bg-primary/40 motion-reduce:transition-none">
             <Play size={18} className="ml-0.5 fill-current" />
           </div>

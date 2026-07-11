@@ -1,4 +1,5 @@
 import type { Offer, Network } from "@/lib/data";
+import { scaleIndex, spendBand } from "@/lib/utils";
 
 /* Gerador de ofertas "mineradas" — usado pelo transporte SSE da Vercel
  * (Route Handler) e espelha o miner do server/realtime.js. Mantido em TS
@@ -154,24 +155,37 @@ export function generateOffer(): Offer {
   const d = NICHE_DATA[niche];
   const hasVsl = Math.random() > 0.25;
   const vslSeconds = hasVsl ? randInt(300, 900) : 0;
+  const id = `live_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+  // ~25% of live offers carry a deterministic placeholder creative photo
+  // (proves real <img> rendering end-to-end without an external ad API).
+  const photo =
+    Math.random() < 0.25 ? `https://picsum.photos/seed/${id}/640/384` : undefined;
+  const longevityDays = randInt(1, 92);
+  const winningScore = Math.round((randInt(350, 975) / 10) * 10) / 10;
+  const estImpressions = randInt(2, 92) * 100_000;
   return {
-    id: `live_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+    id,
     headline: pick(d.headlines),
     advertiser: pick(d.advertisers),
     network: pick(NETWORKS),
     format: pick(FORMATS as unknown as string[]) as Offer["format"],
     niche,
-    longevityDays: randInt(1, 92),
-    winningScore: Math.round((randInt(350, 975) / 10) * 10) / 10,
-    estImpressions: randInt(2, 92) * 100_000,
+    longevityDays,
+    winningScore,
+    estImpressions,
     country: pick(COUNTRIES),
     thumbnailHue: pick(HUES),
     gradient: pick(GRADIENTS),
+    image: photo,
+    thumb: photo,
     bullets: d.bullets,
     cta: pick(d.ctas),
     funnel: buildFunnel(vslSeconds),
     vslSeconds,
     transcript: buildTranscript(vslSeconds),
+    // Campos derivados opcionais (o cliente recalcula; aqui só para realismo do feed).
+    scaleIndex: scaleIndex({ winningScore, estImpressions, longevityDays }),
+    spendPerDay: spendBand(estImpressions, longevityDays).daily,
   };
 }
 
