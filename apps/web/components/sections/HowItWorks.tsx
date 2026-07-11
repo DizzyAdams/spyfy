@@ -1,8 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Search, Activity, Copy, Rocket } from "lucide-react";
-import { staggerContainer, revealUp } from "@/lib/motion";
+import { staggerContainer, revealUp, signalSweep } from "@/lib/motion";
 
 const steps = [
   {
@@ -28,6 +28,8 @@ const steps = [
 ];
 
 export function HowItWorks() {
+  const reduce = useReducedMotion();
+
   return (
     <section
       id="como-funciona"
@@ -35,10 +37,10 @@ export function HowItWorks() {
     >
       <div className="mx-auto max-w-5xl px-5">
         <motion.div
-          initial="hidden"
-          whileInView="show"
+          initial={reduce ? false : "hidden"}
+          whileInView={reduce ? undefined : "show"}
           viewport={{ once: true, margin: "-80px" }}
-          variants={revealUp}
+          variants={reduce ? undefined : revealUp}
           className="mb-14 max-w-2xl"
         >
           <span className="chip mb-4 !text-accent">Como funciona</span>
@@ -51,10 +53,10 @@ export function HowItWorks() {
         </motion.div>
 
         <motion.ol
-          variants={staggerContainer}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: "-60px" }}
+          variants={reduce ? undefined : staggerContainer}
+          initial={reduce ? false : "hidden"}
+          whileInView={reduce ? undefined : "show"}
+          viewport={{ once: true, margin: "-80px" }}
           className="relative"
         >
           {steps.map((s, i) => {
@@ -93,6 +95,17 @@ export function HowItWorks() {
             );
           })}
         </motion.ol>
+
+        {/* Signal sweep divider between major blocks */}
+        <motion.div
+          aria-hidden
+          className="signal-line mx-auto mt-16 max-w-3xl"
+          initial={reduce ? false : "hidden"}
+          whileInView={reduce ? undefined : "show"}
+          viewport={{ once: true, margin: "-80px" }}
+          variants={signalSweep}
+        />
+
       </div>
     </section>
   );

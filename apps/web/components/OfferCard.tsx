@@ -14,8 +14,10 @@ import {
 } from "lucide-react";
 import { Offer, NETWORKS } from "@/lib/data";
 import { scoreBand, formatNumber, scaleIndex, spendBand, cn } from "@/lib/utils";
-import { cardHover, EXPOCSS } from "@/lib/motion";
+import { cardHover, EXPOCSS, magnetic, fadeIn } from "@/lib/motion";
 import { OfferCreative } from "./OfferCreative";
+
+const MotionLink = motion.create(Link);
 
 const bandIcon = {
   hot: Flame,
@@ -73,9 +75,14 @@ export function OfferCard({
         />
 
         {isNew && (
-          <span className="absolute left-3 top-12 z-20 inline-flex items-center gap-1 rounded-full border border-accent/50 bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent backdrop-blur-md">
+          <motion.span
+            variants={fadeIn}
+            initial={reduce ? false : "hidden"}
+            animate="show"
+            className="absolute left-3 top-12 z-20 inline-flex items-center gap-1 rounded-full border border-accent/50 bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent backdrop-blur-md"
+          >
             Nova
-          </span>
+          </motion.span>
         )}
 
         {/* Creative / thumbnail with gradient placeholder */}
@@ -145,17 +152,20 @@ export function OfferCard({
 
             {/* Índice de Escala (chip violet-soft) + estimativa de gasto diário */}
             <div className="flex items-center justify-between gap-3">
-              <span
+              <motion.span
                 className="chip"
                 style={{
                   color: "var(--violet-soft)",
                   borderColor: "rgba(167, 139, 250, 0.35)",
                   background: "rgba(167, 139, 250, 0.12)",
                 }}
+                initial={reduce ? false : { opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, ease: EXPOCSS, delay: 0.15 }}
               >
                 <Gauge size={12} aria-hidden />
                 Escala {scale}
-              </span>
+              </motion.span>
               <span className="font-mono text-[11px] text-faint tabular-nums">
                 ~R${formatNumber(spend.daily)}/dia · {spend.label}
               </span>
@@ -164,10 +174,17 @@ export function OfferCard({
 
           {/* Quick actions */}
           <div className="flex items-center gap-2 pt-1">
-            <Link href={href} className="btn btn-primary flex-1 !justify-center !py-2 !text-[13px] focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]">
+            <MotionLink
+              href={href}
+              variants={magnetic}
+              initial="rest"
+              animate="rest"
+              whileHover={reduce ? undefined : "hover"}
+              className="btn btn-primary flex-1 !justify-center !py-2 !text-[13px] focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+            >
               <Copy size={14} aria-hidden />
               Clonar
-            </Link>
+            </MotionLink>
             <button
               type="button"
               aria-label="Salvar oferta"

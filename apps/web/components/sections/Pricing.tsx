@@ -10,7 +10,7 @@ import {
 } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { magnetic, revealUp, staggerContainer } from "@/lib/motion";
+import { magnetic, revealUp, staggerContainer, cardHover } from "@/lib/motion";
 
 type Tier = {
   name: string;
@@ -123,13 +123,20 @@ export function Pricing() {
           <motion.div
             key={t.name}
             variants={reduce ? undefined : revealUp}
-            className={cn(
-              "bento group relative flex flex-col rounded-2xl p-6 sm:p-7",
-              t.highlight
-                ? "border-primary bg-primary/[0.06] shadow-glow"
-                : "border-border bg-surface/40",
-            )}
+            className="relative"
           >
+            <motion.div
+              variants={reduce ? undefined : cardHover}
+              initial="rest"
+              animate="rest"
+              whileHover={reduce ? undefined : "hover"}
+              className={cn(
+                "bento group relative flex h-full flex-col rounded-2xl p-6 sm:p-7",
+                t.highlight
+                  ? "border-primary bg-primary/[0.06] shadow-glow"
+                  : "border-border bg-surface/40",
+              )}
+            >
             {t.highlight && (
               <>
                 <span
@@ -197,6 +204,7 @@ export function Pricing() {
                 )}
               </Link>
             </Magnetic>
+          </motion.div>
           </motion.div>
         ))}
       </motion.div>

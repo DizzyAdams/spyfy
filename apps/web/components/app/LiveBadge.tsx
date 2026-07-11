@@ -1,9 +1,10 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Radio, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConnectionStatus } from "@/lib/realtime/types";
+import { fadeIn } from "@/lib/motion";
 
 const META: Record<
   ConnectionStatus,
@@ -13,7 +14,7 @@ const META: Record<
     label: "AO VIVO",
     Icon: Radio,
     cls: "text-success border-success/40 bg-success/10",
-    dot: "bg-success",
+    dot: "bg-success shadow-[0_0_10px_var(--accent)]",
   },
   connecting: {
     label: "Conectando",
@@ -68,19 +69,27 @@ export function LiveBadge({
       role="status"
       aria-live="polite"
     >
-      <span className="inline-flex items-center gap-1.5">
-        <span className="relative flex h-2 w-2">
-          {status === "live" && !reduce && (
-            <motion.span
-              className={cn("absolute inline-flex h-full w-full rounded-full opacity-75", dot)}
-              animate={{ scale: [1, 2.2], opacity: [0.7, 0] }}
-              transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
-            />
-          )}
-          <span className={cn("relative inline-flex h-2 w-2 rounded-full", dot)} />
-        </span>
-        {label}
-      </span>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.span
+          key={status}
+          variants={fadeIn}
+          initial={reduce ? false : "hidden"}
+          animate="show"
+          className="inline-flex items-center gap-1.5"
+        >
+          <span className="relative flex h-2 w-2">
+            {status === "live" && !reduce && (
+              <motion.span
+                className={cn("absolute inline-flex h-full w-full rounded-full opacity-75", dot)}
+                animate={{ scale: [1, 2.2], opacity: [0.7, 0] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
+              />
+            )}
+            <span className={cn("relative inline-flex h-2 w-2 rounded-full", dot)} />
+          </span>
+          {label}
+        </motion.span>
+      </AnimatePresence>
       {showTelemetry && (
         <span className="font-mono text-[10px] font-medium leading-none text-muted/80">
           {perMin}/min · online {formatUptime(uptimeSec)}

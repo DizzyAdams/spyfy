@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Radar, Copy, Bot, Crosshair, Activity, BellRing } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { staggerContainer, revealUp, cardHover } from "@/lib/motion";
@@ -61,13 +61,15 @@ const features: Feature[] = [
 ];
 
 export function Features() {
+  const reduce = useReducedMotion();
+
   return (
     <section id="recursos" className="relative mx-auto max-w-7xl px-5 py-24 sm:py-28">
       <motion.div
-        initial="hidden"
-        whileInView="show"
+        initial={reduce ? false : "hidden"}
+        whileInView={reduce ? undefined : "show"}
         viewport={{ once: true, margin: "-80px" }}
-        variants={revealUp}
+        variants={reduce ? undefined : revealUp}
         className="mb-12 max-w-2xl"
       >
         <span className="chip mb-4 !text-primary">Recursos</span>
@@ -81,23 +83,23 @@ export function Features() {
       </motion.div>
 
       <motion.div
-        variants={staggerContainer}
-        initial="hidden"
-        whileInView="show"
+        variants={reduce ? undefined : staggerContainer}
+        initial={reduce ? false : "hidden"}
+        whileInView={reduce ? undefined : "show"}
         viewport={{ once: true, margin: "-80px" }}
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6 lg:auto-rows-[minmax(11rem,auto)]"
       >
         {features.map((f) => (
           <motion.div
             key={f.title}
-            variants={revealUp}
+            variants={reduce ? undefined : revealUp}
             className={cn("min-w-0", f.span)}
           >
             <motion.div
-              variants={cardHover}
+              variants={reduce ? undefined : cardHover}
               initial="rest"
               animate="rest"
-              whileHover="hover"
+              whileHover={reduce ? undefined : "hover"}
               className="bento group relative flex h-full flex-col overflow-hidden rounded-2xl p-6 transition-colors duration-300 hover:border-primary/40"
             >
               <span

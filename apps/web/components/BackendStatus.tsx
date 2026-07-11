@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { getHealth, getVersion, isApiConfigured } from "@/lib/api";
+import { fadeIn } from "@/lib/motion";
 
 type State = "idle" | "loading" | "online" | "offline";
 
@@ -17,6 +19,7 @@ export function BackendStatus({ className }: { className?: string }) {
     isApiConfigured() ? "loading" : "idle",
   );
   const [version, setVersion] = useState("");
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     if (!isApiConfigured()) {
@@ -47,7 +50,7 @@ export function BackendStatus({ className }: { className?: string }) {
     },
     loading: {
       label: "Conectando ao backend…",
-      dot: "bg-accent animate-pulse",
+      dot: "bg-accent",
       tone: "text-muted",
     },
     online: {
@@ -73,7 +76,20 @@ export function BackendStatus({ className }: { className?: string }) {
         className,
       )}
     >
-      <span aria-hidden className={cn("h-2 w-2 rounded-full", s.dot)} />
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.span
+          key={state}
+          variants={fadeIn}
+          initial={reduce ? false : "hidden"}
+          animate="show"
+          aria-hidden
+          className={cn(
+            "h-2 w-2 rounded-full",
+            s.dot,
+            state === "loading" && !reduce && "animate-pulse",
+          )}
+        />
+      </AnimatePresence>
       {s.label}
     </span>
   );

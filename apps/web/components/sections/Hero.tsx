@@ -16,7 +16,7 @@ import { GradientMesh } from "../illustrations/GradientMesh";
 import { OfferCreative } from "../OfferCreative";
 import { CountUp } from "../CountUp";
 import { cn } from "@/lib/utils";
-import { staggerContainer, revealUp, revealMask } from "@/lib/motion";
+import { staggerContainer, revealUp, revealMask, signalSweep } from "@/lib/motion";
 
 export function Hero() {
   const reduce = useReducedMotion();
@@ -199,16 +199,23 @@ export function Hero() {
         </motion.div>
       </div>
 
-      {/* Signal sweep divider */}
+      {/* Signal sweep divider — expands scaleX 0->1 on view (DEEP SIGNAL) */}
       <div className="relative mx-auto mt-16 max-w-7xl px-5">
-        <div className="signal-line" aria-hidden="true">
+        <motion.div
+          aria-hidden
+          className="signal-line"
+          initial={reduce ? false : "hidden"}
+          whileInView={reduce ? undefined : "show"}
+          viewport={{ once: true, margin: "-80px" }}
+          variants={signalSweep}
+        >
           {!reduce && (
             <span
               className="absolute inset-y-0 left-0 w-[42%] animate-sweep bg-[linear-gradient(90deg,transparent,var(--violet-soft),var(--cyan),transparent)]"
               style={{ filter: "blur(0.4px)" }}
             />
           )}
-        </div>
+        </motion.div>
       </div>
     </section>
   );
