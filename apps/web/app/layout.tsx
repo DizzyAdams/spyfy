@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { CursorAura } from "@/components/illustrations/CursorAura";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://spyfy.io"),
+  metadataBase: new URL("https://spyfyprod.vercel.app"),
   title: {
     default: "SpyFy — Inteligência de anúncios e clonagem de ofertas",
     template: "%s · SpyFy",
@@ -17,6 +17,11 @@ export const metadata: Metadata = {
     type: "website",
     locale: "pt_BR",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#06070B",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
