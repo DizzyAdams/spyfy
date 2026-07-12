@@ -54,3 +54,23 @@ O frontend degrada graciosamente ("Backend offline") se a API não responder.
 ## Rollback / atualização
 A cada push na `main`, basta **Redeploy** no Coolify (ou automatize com webhook
 do GitHub). Imagens são reconstruídas a partir do `Dockerfile`.
+
+## Deploy automatizado via API (sem clicar na UI)
+
+Se preferir disparar o deploy por script (CI/CD, ou sem acesso ao painel):
+
+```powershell
+# Requer token Coolify com ability "deploy" (e "read" para descoberta por nome).
+$env:COOLIFY_TOKEN = 'seu-token'
+.\scripts\deploy-coolify.ps1 `
+  -CoolifyHost https://seu.coolify.dev `
+  -Token $env:COOLIFY_TOKEN `
+  -ApplicationName spyfy-api -Force
+```
+
+O script (`scripts/deploy-coolify.ps1`) faz healthcheck da API, resolve o UUID
+da aplicação por nome (`GET /api/v1/applications`) e dispara o deploy
+(`POST /api/v1/applications/{uuid}/deployments`). A rota de deploy é
+sobrescrevível via `-DeployEndpoint` caso sua instância use padrão diferente.
+Use `-DryRun` para validar a conexão sem disparar deploy.
+
