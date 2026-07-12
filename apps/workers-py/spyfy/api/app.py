@@ -20,10 +20,14 @@ from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from .. import __version__
-from ..agents import MEMBERS, OfferMemory, run_offer_pipeline
-from ..offers_service import compute_metrics, discover_offers, get_offer_by_id
+# agents importados LAZY (dentro de /v1/agents/*) para permitir um deploy leve
+# (ex.: Vercel serverless, ~250MB) sem chromadb/langgraph instalados. Quando
+# essas deps estao presentes (Docker/Render/HF/local), os endpoints funcionam 100%.
+from ..offers_service import (NICHE_KEY, compute_metrics, discover_offers,
+                              get_offer_by_id)
 from ..events import EVENT_TYPES, DomainEvent, EventBus
 from ..notifications import (Channel, Notification, NotificationPrefs, Priority)
 from ..notifiers import (AppriseAdapter, NotificationDispatcher, NovuAdapter,
@@ -32,6 +36,15 @@ from ..roi import AdSignals, NicheEconomics, estimate_offer
 from ..webhooks import DedupStore, parse_event, verify_webhook
 from .schemas import (AgentRunRequest, EstimateRequest, EstimateResponse, Health,
                       NotifyRequest, NotifyResponse, RagQueryRequest, WebhookAck)
+
+
+class CloneRequest(BaseModel):
+    """Corpo de POST /v1/clone (A11 Cloner)."""
+
+    offer_id: str | None = None
+    url: str | None = None
+    niche: str | None = None
+    country: str = "BR"
 
 
 def build_dispatcher() -> NotificationDispatcher:
@@ -48,12 +61,11 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
     bus = EventBus()
     dispatcher = dispatcher or build_dispatcher()
     dedup = DedupStore()
-    # Memória RAG compartilhada (ephemeral em memória) — persiste ofertas
-    # indexadas pelo pipeline autônomo e responde consultas semânticas.
-    memory = OfferMemory()
+    # Memória RAG compartilhada — criada lazy no primeiro uso de /v1/agents/*
+    # (importa chromadb/langgraph sob demanda, permitindo deploy leve sem essas deps).
     app.state.bus = bus
     app.state.dispatcher = dispatcher
-    app.state.memory = memory
+    app.state.memory = None
 
     # CORS: permite que o frontend (Vercel em produção + localhost em dev)
     # chame a API a partir do navegador. Origens configuráveis via CORS_ORIGINS.
@@ -152,6 +164,13 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
         alertas (A13) são publicados no bus e as ofertas ficam indexadas para
         recuperação semântica. Roda offline por padrão (sem LLM).
         """
+        try:
+            from ..agents import MEMBERS, OfferMemory, run_offer_pipeline
+        except Exception:
+            return {"status": "unavailable",
+                    "detail": "engine de agentes (chromadb/langgraph) nao instalado neste deploy"}
+        if app.state.memory is None:
+            app.state.memory = OfferMemory()
         final = await run_offer_pipeline(
             req.objective,
             niche=req.niche, network=req.network, country=req.country,
@@ -164,12 +183,21 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
     @app.post("/v1/agents/rag/query")
     def rag_query(req: RagQueryRequest) -> dict:
         """Recuperação semântica (RAG) sobre a memória de ofertas indexadas."""
+        try:
+            from ..agents import OfferMemory
+        except Exception:
+            return {"query": req.text, "count": 0, "hits": [],
+                    "detail": "memoria RAG (chromadb) nao instalada neste deploy"}
+        if app.state.memory is None:
+            app.state.memory = OfferMemory()
         hits = app.state.memory.query(req.text, n=req.n)
         return {"query": req.text, "count": len(hits), "hits": hits}
 
     @app.get("/v1/agents/rag/count")
     def rag_count() -> dict:
         """Nº de ofertas indexadas na memória RAG (long-term memory)."""
+        if app.state.memory is None:
+            return {"count": 0}
         return {"count": app.state.memory.count()}
 
     @app.get("/v1/offers")
@@ -216,6 +244,50 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
             simulate=simulate, token=token,
         )
         return compute_metrics(offers)
+
+    @app.post("/v1/clone")
+    def clone(req: CloneRequest) -> dict:
+        """Clona uma LP/oferta (A11 Cloner).
+
+        Recebe ``offer_id`` (busca o offer simulado) ou ``url`` (fetch real
+        com fallback gracioso) e devolve um *clone bundle* estruturado +
+        HTML reconstruído pronto para exportar.
+        """
+        from ..clone import clone_offer
+
+        offer = None
+        if req.offer_id:
+            offer = get_offer_by_id(req.offer_id, simulate=True)
+            if offer is None:
+                raise HTTPException(404, "oferta não encontrada")
+        niche = req.niche or (offer or {}).get("niche")
+        return clone_offer(url=req.url, offer=offer, niche=niche, country=req.country)
+
+    @app.get("/v1/categories")
+    def categories() -> dict:
+        """Catálogo de categorias (nichos PT) suportadas + redes + contagens.
+
+        Útil para o frontend montar filtros "melhores anúncios por categoria"
+        e mostrar quantas ofertas o SpyFy está ranqueando em cada nicho.
+        """
+        labels = sorted(set(NICHE_KEY.keys()))
+        out = []
+        for label in labels:
+            try:
+                offers = discover_offers(niche=label, limit=12, simulate=True)
+            except Exception:  # noqa: BLE001
+                offers = []
+            best = max((float(o.get("winningScore", 0)) for o in offers), default=0.0)
+            out.append(
+                {
+                    "label": label,
+                    "key": NICHE_KEY.get(label, "finance"),
+                    "available": len(offers) > 0,
+                    "count": len(offers),
+                    "topScore": round(best, 1),
+                }
+            )
+        return {"categories": out, "networks": ["meta", "tiktok", "google", "youtube", "native", "pinterest"]}
 
     @app.get("/v1/offers/{offer_id}")
     def get_offer(offer_id: str) -> dict:

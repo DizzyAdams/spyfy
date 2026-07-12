@@ -44,7 +44,27 @@ pwsh scripts/deploy-backend.ps1 -Platform render
 
 Vantagem: 16GB RAM (chromadb/langgraph folgam), sem cold-start agressivo.
 
-## Opção C — Cloudflare Tunnel (free, sem conta, efêmero)
+## Opção C — Coolify (self-hosted, Docker, free tier)
+
+[Coolify](https://coolify.io) é uma PaaS open-source auto-hospedada (você
+fornece a VM barata/gratuita — e.g. Oracle Always Free, Hetzner, VPS). O
+backend já roda via Docker, então o deploy é trivial:
+
+1. Instale o Coolify na sua VM (1 comando: `curl -fsSL https://get.coolify.io | bash`).
+2. No painel → **New Resource** → **Docker Compose** → aponte para
+   `apps/workers-py/docker-compose.yml` (ou cole o conteúdo).
+3. Coolify injeta `$PORT`; o `Dockerfile` e o `docker-compose.yml` já a honram.
+4. Defina as env vars (Coolify → variáveis do projeto):
+   - `WEBHOOK_SECRET` → segredo forte
+   - `NTFY_URL` → `https://ntfy.sh/spyfy`
+   - `CORS_ORIGINS` → inclua `https://spyfyprod.vercel.app`
+5. Deploy. O healthcheck `/health` é usado pelo Coolify para considerar "Healthy".
+
+Vantagem: controle total, sem limite de cold-start agressivo, RAM que você
+escolher (chromadb/langgraph folgam em 1–2GB). Free tier efetivo se a VM for
+gratuita. Veja `docs/08-devops/coolify.md` para o passo a passo detalhado.
+
+## Opção D — Cloudflare Tunnel (free, sem conta, efêmero)
 
 Para expor um backend rodando localmente sem conta:
 ```powershell

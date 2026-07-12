@@ -7,8 +7,8 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# deps
-COPY requirements.txt .
+# deps (conjunto completo: chromadb+langgraph p/ os agents autônomos)
+COPY requirements.docker.txt requirements.txt
 RUN pip install -r requirements.txt
 
 # código

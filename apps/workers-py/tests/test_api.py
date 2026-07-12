@@ -140,3 +140,28 @@ def test_agents_rag_query_and_count(client):
     assert q.status_code == 200
     assert q.json()["count"] >= 1
     assert q.json()["hits"][0]["similarity"] is not None
+
+
+def test_categories(client):
+    r = client.get("/v1/categories")
+    assert r.status_code == 200
+    cats = r.json()["categories"]
+    assert len(cats) >= 5
+    assert all("label" in c and "count" in c and "topScore" in c for c in cats)
+    assert "meta" in r.json()["networks"]
+
+
+def test_clone_by_offer_id(client):
+    oid = client.get("/v1/offers", params={"niche": "keto", "limit": 1}).json()["offers"][0]["id"]
+    r = client.post("/v1/clone", json={"offer_id": oid})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["clone_id"].startswith("cl_")
+    assert "<!doctype html>" in data["html"]
+    assert any(s["label"] == "Checkout" for s in data["funnel"])
+
+
+def test_clone_unknown_offer_404(client):
+    r = client.post("/v1/clone", json={"offer_id": "ofr_nope"})
+    assert r.status_code == 404
+

@@ -1,0 +1,15 @@
+# Vercel serverless build uses the LEAN dependency set in requirements.txt
+# (FastAPI/Uvicorn/Pydantic/Httpx/Tenacity/Apprise) so the function stays
+# under the Python serverless size limit. The full dependency set
+# (chromadb/langgraph/langchain/playwright/torch via pyproject.toml + uv.lock)
+# is only for local dev and the Docker/Render container build, NOT for Vercel.
+# Excluding these forces @vercel/python to fall back to requirements.txt.
+uv.lock
+pyproject.toml
+
+# Local dev / debugging artifacts — never deploy these.
+.venv_lean/
+.venv/
+*.log
+_qip.py
+.vercel/output/
