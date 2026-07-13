@@ -30,6 +30,7 @@ from .radar import (RadarQuery, RadarOffer, run_radar, win_probability,
 from .meta_library import MetaAdLibrary, MetaScrapeError
 from .tiktok_library import TikTokAdLibrary, TikTokScrapeError
 from .google_library import GoogleAdsTransparency, GoogleTransparencyError
+from .native_library import NativeAdsLibrary, NativeAdsError
 from .clone import clone_offer, detect_stack, detect_funnel
 
 
@@ -58,6 +59,7 @@ __all__ = ["AdSignals", "NicheEconomics", "ScoreWeights", "OfferEstimate",
            "MetaAdLibrary", "MetaScrapeError",
            "TikTokAdLibrary", "TikTokScrapeError",
            "GoogleAdsTransparency", "GoogleTransparencyError",
+           "NativeAdsLibrary", "NativeAdsError",
             "clone_offer", "detect_stack", "detect_funnel",
 
            "early_mover_bonus", "radar_report", "should_alert"]

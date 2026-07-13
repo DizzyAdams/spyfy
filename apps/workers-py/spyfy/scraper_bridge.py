@@ -124,6 +124,10 @@ def mine(niche: str, network: str, count: int = 1, simulate: bool = False,
             from .google_library import GoogleAdsTransparency
 
             found = GoogleAdsTransparency(country=country).search(niche, limit=count)
+        elif net == "native":
+            from .native_library import NativeAdsLibrary
+
+            found = NativeAdsLibrary(country=country).search(niche, limit=count)
         if found:
             for o in found:
                 o["niche"] = niche
