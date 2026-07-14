@@ -134,7 +134,7 @@ function OfflineBanner({ onRetry }: { onRetry: () => void }) {
 }
 
 export function FeedView() {
-  const { status, offers, stats, filters, query, newIds, setFilters, search, loadedOnce } =
+  const { status, offers, stats, filters, query, newIds, setFilters, search, loadedOnce, retry } =
     useRealtime();
   const [sort, setSort] = useState<"score" | "longevity">("score");
   const reduce = useReducedMotion();
@@ -168,9 +168,8 @@ export function FeedView() {
 
   // Re-send the active subscription/search so the socket path re-opens.
   const reconnect = useCallback(() => {
-    if (query.trim()) search(query);
-    else setFilters(filters);
-  }, [query, search, setFilters, filters]);
+    retry();
+  }, [retry]);
 
   // Base exibida = ofertas da API (reais, ranqueadas) mescladas com o
   // realtime, dedup por id e ordenadas por winning score.
@@ -211,7 +210,7 @@ export function FeedView() {
         ? b.winningScore - a.winningScore
         : b.longevityDays - a.longevityDays
     );
-  }, [offers, filters, query, sort]);
+  }, [base, filters, query, sort]);
 
   /* ===== GRID BELOW ===== */
 

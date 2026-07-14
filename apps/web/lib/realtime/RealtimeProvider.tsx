@@ -35,6 +35,7 @@ interface RealtimeContextValue {
   setFilters: (f: Partial<RealtimeFilters>) => void;
   search: (q: string) => void;
   loadedOnce: boolean;
+  retry: () => void;
 }
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
@@ -253,9 +254,29 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     [send]
   );
 
+  const retry = useCallback(() => {
+    backoffRef.current = 1000;
+    failsRef.current = 0;
+    openedRef.current = false;
+    if (reconnectRef.current) {
+      clearTimeout(reconnectRef.current);
+      reconnectRef.current = null;
+    }
+    if (wsRef.current) {
+      try {
+        wsRef.current.close();
+      } catch {
+        /* noop */
+      }
+      wsRef.current = null;
+    }
+    setStatus("connecting");
+    connect();
+  }, [connect]);
+
   return (
     <RealtimeContext.Provider
-      value={{ status, offers, stats, filters, query, newIds, setFilters, search, loadedOnce }}
+      value={{ status, offers, stats, filters, query, newIds, setFilters, search, loadedOnce, retry }}
     >
       {children}
     </RealtimeContext.Provider>

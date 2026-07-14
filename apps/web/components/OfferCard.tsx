@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   Bookmark,
   BookmarkCheck,
   Copy,
+  Check,
   Flame,
   TrendingUp,
   Thermometer,
@@ -39,7 +40,10 @@ export function OfferCard({
 }) {
   const reduce = useReducedMotion();
   const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [justSaved, setJustSaved] = useState(false);
+  const [cloned, setCloned] = useState(false);
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const cloneTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     try {
@@ -53,18 +57,37 @@ export function OfferCard({
     saveTimeout.current = setTimeout(() => {
       localStorage.setItem("spyfy_saved", JSON.stringify([...saved]));
     }, 300);
-    return () => clearTimeout(saveTimeout.current);
+    return () => {
+      clearTimeout(saveTimeout.current);
+      clearTimeout(cloneTimeout.current);
+    };
   }, [saved]);
 
   const toggleSave = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    const wasSaved = saved.has(offer.id);
     setSaved((prev) => {
       const next = new Set(prev);
       if (next.has(offer.id)) next.delete(offer.id);
       else next.add(offer.id);
       return next;
     });
+    if (!wasSaved) {
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 1500);
+    }
+  };
+
+  const handleClone = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (cloned) return;
+    setCloned(true);
+    clearTimeout(cloneTimeout.current);
+    cloneTimeout.current = setTimeout(() => {
+      setCloned(false);
+      window.location.href = href;
+    }, 2000);
   };
 
   const band = scoreBand(offer.winningScore);
@@ -229,28 +252,61 @@ export function OfferCard({
 
           {/* Quick actions */}
           <div className="flex items-center gap-2 pt-1">
-            <MotionLink
-              href={href}
-              variants={magnetic}
-              initial="rest"
-              animate="rest"
-              whileHover={reduce ? undefined : "hover"}
+            <button
+              type="button"
+              onClick={handleClone}
+              disabled={cloned}
               className="btn btn-primary flex-1 !justify-center !py-2 !text-[13px] focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
             >
-              <Copy size={14} aria-hidden />
-              Clonar
-            </MotionLink>
+              {cloned ? (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                  className="inline-flex items-center gap-1.5"
+                >
+                  <Check size={14} aria-hidden />
+                  Clonado!
+                </motion.span>
+              ) : (
+                <>
+                  <Copy size={14} aria-hidden />
+                  Clonar
+                </>
+              )}
+            </button>
             <button
               type="button"
               onClick={toggleSave}
               aria-label={saved.has(offer.id) ? "Remover oferta" : "Salvar oferta"}
-              className="btn btn-ghost !px-3 !py-2 focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+              className="relative btn btn-ghost !px-3 !py-2 focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
             >
-              {saved.has(offer.id) ? (
-                <BookmarkCheck size={14} aria-hidden className="text-[var(--accent)]" />
-              ) : (
-                <Bookmark size={14} aria-hidden />
-              )}
+              <motion.span
+                key={saved.has(offer.id) ? "saved" : "unsaved"}
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                className="inline-flex"
+              >
+                {saved.has(offer.id) ? (
+                  <BookmarkCheck size={14} aria-hidden className="text-[var(--accent)]" />
+                ) : (
+                  <Bookmark size={14} aria-hidden />
+                )}
+              </motion.span>
+              <AnimatePresence>
+                {justSaved && (
+                  <motion.span
+                    initial={{ opacity: 0, y: 6, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary/20 px-2 py-0.5 text-[10px] text-primary"
+                  >
+                    Salvo!
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </button>
           </div>
         </div>

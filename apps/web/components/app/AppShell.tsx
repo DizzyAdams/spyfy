@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   LayoutGrid,
   BarChart3,
@@ -34,6 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const reduce = useReducedMotion();
   const { status, search } = useRealtime();
   const [q, setQ] = useState("");
+  const [unreadCount] = useState(3);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const onSearch = (v: string) => {
@@ -127,7 +128,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
           </div>
           <LiveBadge status={status} className="hidden sm:inline-flex" />
-          <button className="relative grid h-9 w-9 place-items-center rounded-lg border border-border bg-surface/60 text-muted hover:text-text" aria-label="Notificações">
+          <button className="relative grid h-9 w-9 place-items-center rounded-lg border border-border bg-surface/60 text-muted hover:text-text" aria-label={`Notificações · ${unreadCount} não lidas`}>
             <Bell size={17} />
             <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent" />
             {!reduce && (
@@ -138,6 +139,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
               />
             )}
+            <AnimatePresence>
+              {unreadCount > 0 && (
+                <motion.span
+                  key="badge"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0, opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                  className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-white tabular-nums"
+                >
+                  {unreadCount}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </button>
           <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-primary to-accent text-sm font-bold text-white">
             F

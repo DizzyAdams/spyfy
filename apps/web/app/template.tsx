@@ -1,12 +1,15 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { pageVariants } from "@/lib/motion";
 
-// App Router page transition — enter animation on every navigation.
+// App Router page transition — subtle slide-up + fade on every navigation.
 export default function Template({ children }: { children: React.ReactNode }) {
   return (
-    <motion.div variants={pageVariants} initial="initial" animate="animate">
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+    >
       {children}
     </motion.div>
   );

@@ -18,6 +18,7 @@ export function OfferDetail({ offer }: { offer: Offer }) {
   const net = NETWORKS.find((n) => n.key === offer.network);
   const reduce = useReducedMotion();
   const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [justSaved, setJustSaved] = useState(false);
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
@@ -36,12 +37,17 @@ export function OfferDetail({ offer }: { offer: Offer }) {
   }, [saved]);
 
   const toggleSave = () => {
+    const wasSaved = saved.has(offer.id);
     setSaved((prev) => {
       const next = new Set(prev);
       if (next.has(offer.id)) next.delete(offer.id);
       else next.add(offer.id);
       return next;
     });
+    if (!wasSaved) {
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 1500);
+    }
   };
 
   const [step, setStep] = useState(-1);
@@ -140,10 +146,33 @@ export function OfferDetail({ offer }: { offer: Offer }) {
           </div>
 
           <div className="flex gap-2">
-            <button onClick={toggleSave} className="btn btn-ghost flex-1">
-              {saved.has(offer.id) ? <BookmarkCheck size={15} className="text-[var(--accent)]" /> : <Bookmark size={15} />}
-              {saved.has(offer.id) ? "Salvo" : "Salvar"}
-            </button>
+            <div className="relative flex-1">
+              <button onClick={toggleSave} className="btn btn-ghost w-full">
+                <motion.span
+                  key={saved.has(offer.id) ? "saved" : "unsaved"}
+                  initial={{ scale: 0.8 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                  className="inline-flex items-center gap-1.5"
+                >
+                  {saved.has(offer.id) ? <BookmarkCheck size={15} className="text-[var(--accent)]" /> : <Bookmark size={15} />}
+                  {saved.has(offer.id) ? "Salvo" : "Salvar"}
+                </motion.span>
+              </button>
+              <AnimatePresence>
+                {justSaved && (
+                  <motion.span
+                    initial={{ opacity: 0, y: 6, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary/20 px-2 py-0.5 text-[10px] text-primary"
+                  >
+                    Salvo!
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </div>
             <button className="btn btn-ghost flex-1"><Bell size={15} /> Alerta</button>
           </div>
         </div>
