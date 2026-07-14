@@ -78,7 +78,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
   // First-load flag: stays false through the initial connecting phase so the
   // feed can show skeletons, then latches true once the socket confirms a live
-  // feed or the layer gives up (offline).
+  // feed or the layer gives up (offline). Falls back after 3s so cached offers
+  // appear even without a WebSocket server — never gets stuck showing skeletons.
   useEffect(() => {
     if (loadedOnceRef.current) return;
     if (status === "live" || status === "offline") {
@@ -86,6 +87,18 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       setLoadedOnce(true);
     }
   }, [status]);
+
+  // Fallback timer: after 3s of connecting, show cached offers anyway.
+  useEffect(() => {
+    if (loadedOnceRef.current) return;
+    const t = setTimeout(() => {
+      if (!loadedOnceRef.current) {
+        loadedOnceRef.current = true;
+        setLoadedOnce(true);
+      }
+    }, 3000);
+    return () => clearTimeout(t);
+  }, []);
 
   /* ===== PROVIDER CONTINUES ===== */
 
