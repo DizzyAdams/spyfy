@@ -49,7 +49,7 @@ function encodeFrame(data, opcode = 0x1) {
   return Buffer.concat([header, payload]);
 }
 
-function makeReceiver(socket, onMessage, onClose) {
+function makeReceiver(socket, onMessage, onClose, onPong) {
   let buf = Buffer.alloc(0);
 
   socket.on("data", (chunk) => {
@@ -87,6 +87,9 @@ function makeReceiver(socket, onMessage, onClose) {
         return;
       } else if (opcode === 0x9) {
         try { socket.write(encodeFrame(payload, 0xa)); } catch (_) {}
+        continue;
+      } else if (opcode === 0xa) {
+        if (typeof onPong === "function") onPong();
         continue;
       } else if (opcode === 0x1 || opcode === 0x2) {
         try { onMessage(payload.toString("utf8")); } catch (_) {}
@@ -254,17 +257,24 @@ function generateOffer() {
   const vslSeconds = hasVsl ? randInt(300, 900) : 0;
   const network = pick(NETWORKS);
   const id = `live_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-  // ~25% of live offers carry a deterministic placeholder creative photo
-  // (proves real <img> rendering end-to-end without an external ad API).
-  const photo = Math.random() < 0.25
-    ? `https://picsum.photos/seed/${id}/640/384`
-    : undefined;
+  const format = pick(FORMATS);
+  // Toda oferta carrega uma capa real (foto) + vídeo inline quando é 'video'.
+  // CDNs públicos confiáveis (sem bloqueio de hotlink/CORS) para provar
+  // renderização de <img> e <video> end-to-end no feed e no detalhe.
+  const photo = `https://picsum.photos/seed/${id}/640/384`;
+  const VIDEOS = [
+    "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4",
+    "https://www.w3schools.com/html/mov_bbb.mp4",
+    "https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_1MB.mp4",
+    "https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_1MB.mp4",
+  ];
+  const video = format === "video" ? pick(VIDEOS) : "";
   return {
     id,
     headline: pick(d.headlines),
     advertiser: pick(d.advertisers),
     network,
-    format: pick(FORMATS),
+    format,
     niche,
     longevityDays: randInt(1, 92),
     winningScore: Math.round((randInt(350, 975) / 10) * 10) / 10,
@@ -274,6 +284,7 @@ function generateOffer() {
     gradient: pick(GRADIENTS),
     image: photo,
     thumb: photo,
+    videoUrl: video,
     bullets: d.bullets,
     cta: pick(d.ctas),
     funnel: buildFunnel(vslSeconds),
@@ -324,6 +335,9 @@ function normalizeOffer(raw) {
         : pick(GRADIENTS),
     bullets: Array.isArray(o.bullets) ? o.bullets.map(String) : [],
     cta: String(o.cta || "Ver oferta"),
+    image: typeof o.image === "string" ? o.image : undefined,
+    thumb: typeof o.thumb === "string" ? o.thumb : undefined,
+    videoUrl: typeof o.videoUrl === "string" ? o.videoUrl : (typeof o.video === "string" ? o.video : undefined),
     funnel:
       Array.isArray(o.funnel) && o.funnel.length
         ? o.funnel.map((f) => ({
@@ -514,7 +528,8 @@ server.on("upgrade", (req, socket) => {
         client.query = typeof msg.query === "string" ? msg.query : "";
       }
     },
-    () => clients.delete(client)
+    () => clients.delete(client),
+    () => { client.alive = true; }
   );
 
   // Heartbeat

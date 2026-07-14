@@ -19,14 +19,18 @@ import type {
   ServerMessage,
 } from "./types";
 
+// Allow connection status to represent polling fallback
+type ExtendedConnectionStatus = ConnectionStatus | "polling";
+
 const RT_URL = process.env.NEXT_PUBLIC_REALTIME_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://workers-py.vercel.app";
 const PORT = process.env.NEXT_PUBLIC_REALTIME_PORT || "4000";
 const MAX_OFFERS = 240;
 const MAX_BACKOFF = 15_000;
 const WATCHDOG_MS = 18_000;
 
 interface RealtimeContextValue {
-  status: ConnectionStatus;
+  status: ExtendedConnectionStatus;
   offers: Offer[];
   stats: RealtimeStats | null;
   filters: RealtimeFilters;
@@ -41,7 +45,9 @@ interface RealtimeContextValue {
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
 
 export function RealtimeProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<ConnectionStatus>("connecting");
+  const [status, setStatus] = useState<ExtendedConnectionStatus>(
+    RT_URL ? "connecting" : "polling"
+  );
   const [offers, setOffers] = useState<Offer[]>(() => OFFERS.slice(0, 60));
   const [stats, setStats] = useState<RealtimeStats | null>(null);
   const [filters, setFiltersState] = useState<RealtimeFilters>({
@@ -69,6 +75,58 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const openedRef = useRef(false);
   const lastMsgRef = useRef<number>(Date.now());
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Helper to fetch from REST API
+  const fetchFromRest = useCallback(async () => {
+    try {
+      const { network, niche, country } = filtersRef.current;
+      const params = new URLSearchParams();
+      if (network && network !== "all") params.append("network", network);
+      if (niche && niche !== "Todos") params.append("niche", niche);
+      if (country && country !== "all") params.append("country", country);
+      params.append("limit", "24");
+
+      const res = await fetch(`${API_URL}/v1/offers?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.offers && Array.isArray(data.offers)) {
+          setOffers((prev) => {
+            const newOffers = data.offers.filter((o: any) => !prev.some(p => p.id === o.id));
+            if (newOffers.length > 0) {
+              setNewIds(new Set(newOffers.map((o: any) => o.id)));
+              setTimeout(() => setNewIds(new Set()), 2600);
+            }
+            // Marge and dedup
+            const all = [...data.offers, ...prev];
+            const unique = Array.from(new Map(all.map((o) => [o.id, o])).values());
+            return unique.slice(0, MAX_OFFERS);
+          });
+          setLoadedOnce(true);
+          loadedOnceRef.current = true;
+        }
+      }
+
+      // Also fetch stats
+      const statsRes = await fetch(`${API_URL}/v1/metrics?${params.toString()}`);
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats({
+          totalMined: statsData.total ?? statsData.total_offers ?? 0,
+          perMin: typeof statsData.per_min === "number" ? statsData.per_min : 0,
+          connections: 1,
+          uptimeSec: typeof statsData.uptime_sec === "number" ? statsData.uptime_sec : 0,
+        });
+      }
+
+      // REST respondeu com dados reais → tratamos como feed "ao vivo"
+      // (nunca mais ficamos presos em "Conectando").
+      setStatus((s) => (s === "connecting" || s === "polling" ? "live" : s));
+    } catch (err) {
+      console.warn("[RealtimeProvider] Polling falhou:", err);
+      setStatus((s) => (s === "connecting" ? "polling" : s));
+    }
+  }, []);
 
   useEffect(() => {
     filtersRef.current = filters;
@@ -112,7 +170,28 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
   const connect = useCallback(() => {
     if (typeof window === "undefined") return;
+    // Sem servidor WebSocket configurado (NEXT_PUBLIC_REALTIME_URL): não
+    // ficamos travados em "Conectando". Vamos direto pro fallback REST,
+    // que marca o feed como "live" assim que os dados chegarem.
+    if (!RT_URL) {
+      setStatus("polling");
+      if (!pollingRef.current) {
+        fetchFromRest(); // initial fetch
+        pollingRef.current = setInterval(fetchFromRest, 10000); // poll every 10s
+      }
+      return;
+    }
     setStatus((s) => (s === "offline" ? "offline" : "connecting"));
+    if (failsRef.current >= 3) {
+      // Switch to REST polling fallback
+      setStatus("polling");
+      if (!pollingRef.current) {
+        fetchFromRest(); // initial fetch
+        pollingRef.current = setInterval(fetchFromRest, 10000); // poll every 10s
+      }
+      return;
+    }
+
     let ws: WebSocket;
     try {
       const url =
@@ -121,13 +200,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       ws = new WebSocket(url);
     } catch {
       failsRef.current += 1;
-      setStatus("offline");
       scheduleReconnect();
       return;
     }
     wsRef.current = ws;
 
     ws.onopen = () => {
+      if (wsRef.current !== ws) return;
       openedRef.current = true;
       failsRef.current = 0;
       backoffRef.current = 1000;
@@ -138,6 +217,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     };
 
     ws.onmessage = (ev) => {
+      if (wsRef.current !== ws) return;
       lastMsgRef.current = Date.now();
       let msg: ServerMessage;
       try {
@@ -172,15 +252,26 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     };
 
     ws.onclose = () => {
+      if (wsRef.current !== ws) return;
       wsRef.current = null;
       if (!openedRef.current) failsRef.current += 1;
       else failsRef.current = 0;
       openedRef.current = false;
-      setStatus(failsRef.current >= 6 ? "offline" : "connecting");
-      scheduleReconnect();
+      
+      if (failsRef.current >= 3) {
+        setStatus("polling");
+        if (!pollingRef.current) {
+          fetchFromRest();
+          pollingRef.current = setInterval(fetchFromRest, 10000);
+        }
+      } else {
+        setStatus("connecting");
+        scheduleReconnect();
+      }
     };
 
     ws.onerror = () => {
+      if (wsRef.current !== ws) return;
       try {
         ws.close();
       } catch {
@@ -223,6 +314,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         clearInterval(watchdogRef.current);
         watchdogRef.current = null;
       }
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
       if (wsRef.current) {
         try {
           wsRef.current.close();
@@ -240,10 +335,15 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       setFiltersState((prev) => {
         const next = { ...prev, ...f };
         send({ type: "subscribe", filters: next });
+        if (pollingRef.current) {
+          // Immediately fetch new filter data if polling
+          filtersRef.current = next;
+          fetchFromRest();
+        }
         return next;
       });
     },
-    [send]
+    [send, fetchFromRest]
   );
 
   const search = useCallback(
@@ -261,6 +361,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     if (reconnectRef.current) {
       clearTimeout(reconnectRef.current);
       reconnectRef.current = null;
+    }
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
     }
     if (wsRef.current) {
       try {

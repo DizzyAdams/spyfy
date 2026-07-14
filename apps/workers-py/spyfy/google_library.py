@@ -25,7 +25,12 @@ from urllib.parse import urlencode
 
 import httpx
 
-from .realtime_producer import GRADIENTS
+from .realtime_producer import (
+    GRADIENTS,
+    cover_image,
+    looks_like_image,
+    looks_like_video,
+)
 
 AD_TRANSPARENCY_WEB = "https://adstransparency.google.com/"
 
@@ -295,6 +300,10 @@ class GoogleAdsTransparency:
             or d.get("url")
             or d.get("adUrl")
             or "",
+            image="",
+            video="" if fmt != "video" else (
+                d.get("landingPage") or d.get("url") or d.get("adUrl") or ""
+            ),
         )
 
     def _finalize(
@@ -309,6 +318,8 @@ class GoogleAdsTransparency:
         start: datetime | None,
         impr: int,
         snapshot: str,
+        image: str = "",
+        video: str = "",
     ) -> dict:
         longevity = max(1, (_now() - start).days) if start else 1
         has_video = fmt == "video"
@@ -330,6 +341,9 @@ class GoogleAdsTransparency:
             "country": country,
             "thumbnailHue": _hue_from_id(uid),
             "gradient": GRADIENTS[hash(uid) % len(GRADIENTS)],
+            "image": image if looks_like_image(image) else cover_image(uid, "google"),
+            "thumb": image if looks_like_image(image) else cover_image(uid, "google"),
+            "videoUrl": video if looks_like_video(video) else "",
             "bullets": bullets or ["Criativo coletado do Google Ads Transparency"],
             "cta": cta,
             "funnel": [

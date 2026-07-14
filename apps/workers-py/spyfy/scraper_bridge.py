@@ -52,6 +52,46 @@ def build_offer(niche: str, network: str, i: int) -> dict:
     headlines = HEADLINES.get(key, HEADLINES["finance"])
     vsl = random.random() > 0.25
     vsl_min = random.randint(5, 15)
+    format_type = random.choice(["video", "video", "image", "carousel"])
+    
+    # Creative de demonstração — URLs públicas e confiáveis (CDN) que rodam
+    # inline como <video> (mp4) ou <img> (foto), sem bloqueio de hotlink/CORS.
+    NICHE_VIDEO = {
+        "keto": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4",
+        "finance": "https://www.w3schools.com/html/mov_bbb.mp4",
+        "beauty": "https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_1MB.mp4",
+        "marketing": "https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_1MB.mp4",
+    }
+    NICHE_IMAGE = {
+        "keto": [
+            "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80",
+            "https://images.unsplash.com/photo-1511884642898-4c92249e20b6?w=800&q=80",
+            "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=800&q=80",
+        ],
+        "finance": [
+            "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80",
+            "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80",
+        ],
+        "beauty": [
+            "https://images.unsplash.com/photo-1542204165-65bf26472b9b?w=800&q=80",
+            "https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=800&q=80",
+        ],
+        "marketing": [
+            "https://images.unsplash.com/photo-1533750516457-a7f999fc60d?w=800&q=80",
+            "https://images.unsplash.com/photo-1551434678-e076c223a692?w=800&q=80",
+        ],
+    }
+    imgs = NICHE_IMAGE.get(key, NICHE_IMAGE["finance"])
+    if format_type == "video":
+        image_url = random.choice(imgs)
+        video_url = NICHE_VIDEO.get(key, NICHE_VIDEO["finance"])
+    elif format_type == "image":
+        image_url = random.choice(imgs)
+        video_url = ""
+    else:  # carousel
+        image_url = random.choice(imgs)
+        video_url = ""
+        
     offer: dict[str, Any] = {
         "id": f"scrape_{niche}_{network}_{int(time.time())}_{i}",
         "headline": random.choice(headlines),
@@ -62,12 +102,13 @@ def build_offer(niche: str, network: str, i: int) -> dict:
         "winningScore": round(random.uniform(62, 97), 1),
         "longevityDays": random.randint(3, 90),
         "estImpressions": random.randint(2, 92) * 100_000,
-        "format": random.choice(["video", "video", "video", "image", "carousel"]),
+        "format": format_type,
         "gradient": random.choice(GRADIENTS),
-        "image": "",
-        "thumb": "",
-        "bullets": ["Anglo extraído do scraper", "Funil detectado automaticamente"],
-        "cta": "Ver oferta",
+        "image": image_url,
+        "thumb": image_url,
+        "videoUrl": video_url,
+        "bullets": ["Alta conversão detectada", "Funil validado automaticamente"],
+        "cta": "Saiba mais",
         "funnel": [
             {"type": "lp", "label": "Landing Page", "stack": random.choice(["ClickFunnels", "Unbounce", "Elementor"])},
             *([{"type": "vsl", "label": f"VSL {vsl_min}min", "stack": random.choice(["Vimeo", "YouTube", "Wistia"])}] if vsl else []),

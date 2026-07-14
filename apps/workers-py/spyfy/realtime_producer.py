@@ -31,6 +31,50 @@ GRADIENTS = [
     ["#A855F7", "#22D3EE"], ["#F472B6", "#7C5CFF"], ["#34D399", "#22D3EE"],
 ]
 
+# ---- Media URL guards -------------------------------------------------------
+# As Ad Libraries retornam, no máximo, a URL da *página* do anúncio
+# (snapshot/landing page). Usar essa URL como <img src> ou <video src>
+# quebra a renderização no navegador. Estes helpers garantem que só
+# passamos adiante URLs que realmente parecem ser a mídia (arquivo
+# direto de imagem/vídeo), caindo num cover determinístico quando não.
+
+_IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif")
+_VIDEO_EXT = (".mp4", ".webm", ".mov", ".ogg", ".m4v")
+_IMAGE_HOST_HINTS = (
+    "fbcdn", "fbsbx", "googleusercontent", "twimg", "tiktokcdn",
+    "picsum.photos", "unsplash", "images-wixmp", "cloudfront", "wixmp",
+)
+
+
+def looks_like_image(url: str | None) -> bool:
+    """True só quando `url` é plausivelmente um arquivo de imagem direto."""
+    u = (url or "").lower()
+    if not u:
+        return False
+    if u.endswith(_IMAGE_EXT):
+        return True
+    return any(h in u for h in _IMAGE_HOST_HINTS)
+
+
+def looks_like_video(url: str | None) -> bool:
+    """True só quando `url` é plausivelmente um arquivo de vídeo direto."""
+    u = (url or "").lower()
+    if not u:
+        return False
+    if u.endswith(_VIDEO_EXT):
+        return True
+    return "video" in u and any(
+        h in u for h in ("tiktokcdn", "fbcdn", "cloudfront", "googlevideo", "vimeocdn")
+    )
+
+
+def cover_image(seed: str, network: str = "") -> str:
+    """Cover determinístico (mesmo seed -> mesma foto) p/ o card nunca ficar
+    só com o gradiente quando não há imagem real confiável."""
+    safe = "".join(ch for ch in (seed or "spyfy") if ch.isalnum()) or "spyfy"
+    net = (network or "spyfy").lower()
+    return f"https://picsum.photos/seed/{net}_{safe}/640/384"
+
 
 def _post(url: str, token: str, payload: dict, timeout: int = 10) -> dict:
     data = json.dumps(payload).encode("utf-8")

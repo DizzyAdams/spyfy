@@ -26,7 +26,12 @@ from urllib.parse import urlencode
 
 import httpx
 
-from .realtime_producer import GRADIENTS
+from .realtime_producer import (
+    GRADIENTS,
+    cover_image,
+    looks_like_image,
+    looks_like_video,
+)
 
 AD_LIBRARY_WEB = "https://ads.tiktok.com/ad-library"
 AD_LIBRARY_API = "https://ads.tiktok.com/open_api/v1.3/ad_library/get/"
@@ -184,7 +189,7 @@ class TikTokAdLibrary:
             "query": query,
             "region": country,
             "page_size": str(min(limit, 100)),
-            "ad_format": media_types[0] if media_types else "ALL",
+            "ad_format": media_types[0].upper() if media_types else "ALL",
         }
         resp = self.client.get(
             AD_LIBRARY_API,
@@ -335,6 +340,12 @@ class TikTokAdLibrary:
         impr = _parse_impressions(d.get("impressions"))
         country = str(d.get("region") or d.get("country") or self.country or "BR")
         fmt = _infer_format(d)
+        snapshot = (
+            d.get("landingPageUrl")
+            or d.get("adUrl")
+            or d.get("url")
+            or ""
+        )
         return self._finalize(
             uid=aid,
             headline=headline,
@@ -344,10 +355,9 @@ class TikTokAdLibrary:
             fmt=fmt,
             start=start,
             impr=impr,
-            snapshot=d.get("landingPageUrl")
-            or d.get("adUrl")
-            or d.get("url")
-            or "",
+            snapshot=snapshot,
+            image="",
+            video="" if fmt != "video" else snapshot,
         )
 
 
@@ -366,6 +376,12 @@ class TikTokAdLibrary:
         impr = _parse_impressions(d.get("impressions"))
         country = str(d.get("region") or d.get("country") or self.country or "BR")
         fmt = _infer_format(d)
+        snapshot = (
+            d.get("ad_url")
+            or d.get("landingPageUrl")
+            or d.get("url")
+            or ""
+        )
         return self._finalize(
             uid=aid,
             headline=headline,
@@ -375,7 +391,9 @@ class TikTokAdLibrary:
             fmt=fmt,
             start=start,
             impr=impr,
-            snapshot=d.get("ad_url") or d.get("landingPageUrl") or d.get("url") or "",
+            snapshot=snapshot,
+            image="",
+            video="" if fmt != "video" else snapshot,
         )
 
     def _finalize(
@@ -390,6 +408,8 @@ class TikTokAdLibrary:
         start: datetime | None,
         impr: int,
         snapshot: str,
+        image: str = "",
+        video: str = "",
     ) -> dict:
         longevity = max(1, (_now() - start).days) if start else 1
         has_video = fmt == "video"
@@ -398,6 +418,11 @@ class TikTokAdLibrary:
             impr = int(200_000 + score * 60_000)
         bullets = _bullets_from_body(body)
         cta = "Ver anúncio" if snapshot else "Ver oferta"
+        # TikTok Ad Library snapshot payloads raramente trazem a imagem do
+        # criativo; garantimos uma foto de capa determinística (mesmo uid) para
+        # o card nunca ficar só com o gradiente.
+        if not image:
+            image = f"https://picsum.photos/seed/tiktok_{uid}/640/384"
         return {
             "id": f"tiktok_{uid}",
             "headline": headline.strip()[:160] or "Oferta da TikTok Ad Library",
@@ -411,6 +436,9 @@ class TikTokAdLibrary:
             "country": country,
             "thumbnailHue": _hue_from_id(uid),
             "gradient": GRADIENTS[hash(uid) % len(GRADIENTS)],
+            "image": image if looks_like_image(image) else cover_image(uid, "tiktok"),
+            "thumb": image if looks_like_image(image) else cover_image(uid, "tiktok"),
+            "videoUrl": video if looks_like_video(video) else "",
             "bullets": bullets or ["Criativo coletado da TikTok Ad Library"],
             "cta": cta,
             "funnel": [

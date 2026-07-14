@@ -1,32 +1,31 @@
 import { NextResponse } from "next/server";
 
+// Health probe consumido por <BackendStatus> (Navbar/Footer). Faz um GET no
+// backend real e reflete online/offline. Nunca quebra a página — degrada para
+// "offline" graciosamente. Backend estável em spyfyv1prod.vercel.app.
 export const dynamic = "force-dynamic";
 
-/**
- * Proxy de health check — a única rota de API next.js do frontend.
- *
- * Em vez de o cliente chamar diretamente a API FastAPI (sujeito a CORS),
- * ele bate aqui, e esta rota faz o fetch server-side. O resultado é
- * entregue na mesma origin, sem necessidade de configurar CORS no backend.
- */
-export async function GET() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
-  if (!apiUrl) {
-    return NextResponse.json({ status: "unconfigured", version: "0.2.0" });
-  }
+const FALLBACK_API = "https://spyfyv1prod.vercel.app";
 
+export async function GET() {
+  const base = (process.env.NEXT_PUBLIC_API_URL || FALLBACK_API).replace(/\/+$/, "").trim();
   try {
-    const res = await fetch(`${apiUrl}/health`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) throw new Error("Backend unhealthy");
-    const data = await res.json();
-    return NextResponse.json({ ...data, proxy: true });
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 9000);
+    const res = await fetch(`${base}/health`, { cache: "no-store", signal: ctrl.signal });
+    clearTimeout(t);
+    if (res.ok) {
+      let version = "";
+      try {
+        const data = await res.json();
+        version = data.version || data.commit || "";
+      } catch {
+        /* body não-JSON: ignora */
+      }
+      return NextResponse.json({ status: "ok", version });
+    }
+    return NextResponse.json({ status: "offline", version: "" });
   } catch {
-    return NextResponse.json({
-      status: "backend-offline",
-      version: "0.2.0",
-      proxy: true,
-    });
+    return NextResponse.json({ status: "offline", version: "" });
   }
 }

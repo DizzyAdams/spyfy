@@ -1,32 +1,40 @@
-import { notFound } from "next/navigation";
 import { getOffer, type Offer } from "@/lib/data";
-import { OfferDetail } from "@/components/app/OfferDetail";
+import { OfferDetailLoader } from "@/components/app/OfferDetailLoader";
 
-// A rota é dinâmica: busca o detalhe na API (ofertas reais das
-// Ad Libraries) a cada request, então NÃO pode ser estática.
+// Rota dinâmica: detalhe vem das Ad Libraries reais a cada request.
 export const dynamic = "force-dynamic";
 
-// Tenta o mock local; se não achar (oferta vinda da API /v1/offers),
-// busca o detalhe real no backend (ID determinístico ofr_{net}_{key}_{i}).
+// Backend estável (Vercel Python) — fallback quando a env não está injetada.
+const FALLBACK_API = "https://spyfyv1prod.vercel.app";
+
+// Tenta o mock local e, se não achar, tenta o backend no SSR (rápido quando
+// o túnel responde). Se falhar, entrega null e o cliente busca no browser
+// (IP residencial, sem challenge do quick-tunnel).
 async function loadOffer(id: string): Promise<Offer | null> {
   const local = getOffer(id);
   if (local) return local;
-  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
-  if (!base) return null;
+  const base = (process.env.NEXT_PUBLIC_API_URL || FALLBACK_API).replace(/\/$/, "");
   try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 4000);
     const r = await fetch(`${base}/v1/offers/${encodeURIComponent(id)}`, {
       cache: "no-store",
+      signal: ctrl.signal,
     });
-    if (!r.ok) return null;
-    return (await r.json()) as Offer;
+    clearTimeout(t);
+    if (r.ok) return (await r.json()) as Offer;
   } catch {
-    return null;
+    /* fallback para fetch no cliente */
   }
+  return null;
 }
 
-export default async function OfferPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OfferPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
   const offer = await loadOffer(id);
-  if (!offer) notFound();
-  return <OfferDetail offer={offer} />;
+  return <OfferDetailLoader id={id} initial={offer} />;
 }

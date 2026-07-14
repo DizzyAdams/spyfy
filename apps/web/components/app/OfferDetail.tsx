@@ -78,7 +78,7 @@ export function OfferDetail({ offer }: { offer: Offer }) {
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-5">
           <div className="overflow-hidden rounded-2xl border border-border">
-            <OfferCreative hue={offer.thumbnailHue} gradient={offer.gradient} label={offer.headline} format={offer.format} className="aspect-[16/9] w-full" />
+            <OfferCreative hue={offer.thumbnailHue} gradient={offer.gradient} label={offer.headline} format={offer.format} image={offer.image} videoUrl={offer.videoUrl} className="aspect-[16/9] w-full" />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

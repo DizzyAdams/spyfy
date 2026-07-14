@@ -24,7 +24,12 @@ from urllib.parse import urlencode
 
 import httpx
 
-from .realtime_producer import GRADIENTS
+from .realtime_producer import (
+    GRADIENTS,
+    cover_image,
+    looks_like_image,
+    looks_like_video,
+)
 
 AD_LIBRARY_WEB = "https://www.facebook.com/ads/library/"
 AD_ARCHIVE_API = "https://graph.facebook.com/v19.0/ads_archive"
@@ -182,7 +187,7 @@ class MetaAdLibrary:
             "search_terms": query,
             "ad_reached_countries": json.dumps([country]),
             "ad_active_status": "ACTIVE",
-            "media_types": ",".join(media_types),
+            "media_type": media_types[0].upper() if media_types else "ALL",
             "fields": ",".join(
                 [
                     "id",
@@ -235,7 +240,7 @@ class MetaAdLibrary:
             "ad_type": "all",
             "country": country,
             "q": query,
-            "media_types": media_types[0] if media_types else "all",
+            "media_type": media_types[0] if media_types else "all",
         }
         url = f"{AD_LIBRARY_WEB}?{urlencode(params)}"
         resp = self.client.get(url)
@@ -330,6 +335,7 @@ class MetaAdLibrary:
         impr = _parse_impressions(d.get("impressions"))
         country = str(d.get("ad_delivery_country") or self.country or "BR")
         fmt = _infer_format(d)
+        snapshot = d.get("snapshot_url") or d.get("ad_snapshot_url") or ""
         return self._finalize(
             uid=aid,
             headline=headline,
@@ -339,7 +345,9 @@ class MetaAdLibrary:
             fmt=fmt,
             start=start,
             impr=impr,
-            snapshot=d.get("snapshot_url") or d.get("ad_snapshot_url") or "",
+            snapshot=snapshot,
+            image=snapshot,
+            video="" if fmt != "video" else snapshot,
         )
 
     def _web_node_to_offer(self, d: dict[str, Any]) -> dict | None:
@@ -359,6 +367,12 @@ class MetaAdLibrary:
         )
         impr = _parse_impressions(d.get("impressions"))
         fmt = _infer_format(d)
+        snapshot = (
+            d.get("snapshotUrl")
+            or d.get("snapshot_url")
+            or d.get("url")
+            or ""
+        )
         return self._finalize(
             uid=aid,
             headline=headline,
@@ -368,10 +382,9 @@ class MetaAdLibrary:
             fmt=fmt,
             start=start,
             impr=impr,
-            snapshot=d.get("snapshotUrl")
-            or d.get("snapshot_url")
-            or d.get("url")
-            or "",
+            snapshot=snapshot,
+            image=snapshot,
+            video="" if fmt != "video" else snapshot,
         )
 
     def _finalize(
@@ -386,6 +399,8 @@ class MetaAdLibrary:
         start: datetime | None,
         impr: int,
         snapshot: str,
+        image: str = "",
+        video: str = "",
     ) -> dict:
         longevity = max(1, (_now() - start).days) if start else 1
         has_video = fmt == "video"
@@ -407,6 +422,9 @@ class MetaAdLibrary:
             "country": country,
             "thumbnailHue": _hue_from_id(uid),
             "gradient": GRADIENTS[hash(uid) % len(GRADIENTS)],
+            "image": image if looks_like_image(image) else cover_image(uid, "meta"),
+            "thumb": image if looks_like_image(image) else cover_image(uid, "meta"),
+            "videoUrl": video if looks_like_video(video) else "",
             "bullets": bullets or ["Criativo coletado da Meta Ad Library"],
             "cta": cta,
             "funnel": [

@@ -152,6 +152,7 @@ export function OfferCard({
               label={offer.headline}
               format={offer.format}
               image={offer.image}
+              videoUrl={offer.videoUrl}
               className="aspect-[5/3] w-full"
             />
           </Link>

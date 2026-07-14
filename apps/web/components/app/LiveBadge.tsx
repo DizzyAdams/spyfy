@@ -4,10 +4,12 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Radio, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConnectionStatus } from "@/lib/realtime/types";
+
+type LiveBadgeStatus = ConnectionStatus | "polling";
 import { fadeIn } from "@/lib/motion";
 
 const META: Record<
-  ConnectionStatus,
+  LiveBadgeStatus,
   { label: string; Icon: typeof Radio; cls: string; dot: string }
 > = {
   live: {
@@ -28,6 +30,12 @@ const META: Record<
     cls: "text-muted border-border bg-surface/60",
     dot: "bg-muted",
   },
+  polling: {
+    label: "AO VIVO",
+    Icon: Radio,
+    cls: "text-success border-success/40 bg-success/10",
+    dot: "bg-success shadow-[0_0_10px_var(--accent)]",
+  },
 };
 
 // Compact uptime formatter: "3m" when >= 60s, otherwise "42s".
@@ -43,7 +51,7 @@ export function LiveBadge({
   perMin,
   uptimeSec,
 }: {
-  status: ConnectionStatus;
+  status: LiveBadgeStatus;
   className?: string;
   perMin?: number;
   uptimeSec?: number;

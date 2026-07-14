@@ -58,7 +58,8 @@ export interface NotifyResponse {
   failed: string[];
 }
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+const FALLBACK_API = "https://spyfyv1prod.vercel.app";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || FALLBACK_API).replace(/\/$/, "");
 
 /** Verdadeiro quando a env NEXT_PUBLIC_API_URL está definida. */
 export const isApiConfigured = (): boolean => API_URL.length > 0;

@@ -16,6 +16,7 @@ export interface Offer {
   gradient: [string, string];
   image?: string; // URL of the actual ad creative (photo/video poster)
   thumb?: string; // thumbnail URL
+  videoUrl?: string; // direct mp4/webm of the creative video (plays inline)
   bullets: string[];
   cta: string;
   funnel: { type: string; label: string; stack?: string }[];
@@ -69,6 +70,9 @@ export const OFFERS: Offer[] = [
     country: "BR",
     thumbnailHue: 280,
     gradient: ["#6E56CF", "#22D3EE"],
+    image: "https://images.unsplash.com/photo-1511884642898-4c92249e20b6?w=800&q=80",
+    thumb: "https://images.unsplash.com/photo-1511884642898-4c92249e20b6?w=800&q=80",
+    videoUrl: "/videos/fitness.mp4",
     bullets: [
       "Protocolo de 3 passos sem academia",
       "Resultados visíveis na primeira semana",
@@ -104,6 +108,9 @@ export const OFFERS: Offer[] = [
     country: "BR",
     thumbnailHue: 190,
     gradient: ["#22D3EE", "#2563EB"],
+    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80",
+    thumb: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80",
+    videoUrl: "/videos/finance.mp4",
     bullets: [
       "Método validado por +3.000 alunos",
       "Sem precisar aparecer (faceless)",
@@ -139,6 +146,8 @@ export const OFFERS: Offer[] = [
     country: "BR",
     thumbnailHue: 330,
     gradient: ["#EC4899", "#6E56CF"],
+    image: "https://images.unsplash.com/photo-1542204165-65bf26472b9b?w=800&q=80",
+    thumb: "https://images.unsplash.com/photo-1542204165-65bf26472b9b?w=800&q=80",
     bullets: ["Fórmula com niacinamida + vitamina C", "Resultado em 14 dias", "Frete grátis hoje"],
     cta: "Comprar com frete grátis",
     funnel: [
@@ -166,6 +175,9 @@ OFFERS.push(
     country: "PT",
     thumbnailHue: 12,
     gradient: ["#F97316", "#EC4899"],
+    image: "https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=800&q=80",
+    thumb: "https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=800&q=80",
+    videoUrl: "/videos/sample1.mp4",
     bullets: ["Gatilhos mentais comprovados", "Sem implorar ou humilhar", "Plano passo a passo"],
     cta: "Quero meu amor de volta",
     funnel: [
@@ -190,6 +202,8 @@ OFFERS.push(
     country: "US",
     thumbnailHue: 150,
     gradient: ["#16A34A", "#22D3EE"],
+    image: "https://images.unsplash.com/photo-1551434678-e076c223a692?w=800&q=80",
+    thumb: "https://images.unsplash.com/photo-1551434678-e076c223a692?w=800&q=80",
     bullets: ["Templates prontos de alta conversão", "Integração com CRM nativa", "Setup em 5 minutos"],
     cta: "Criar meu funil",
     funnel: [
@@ -213,6 +227,8 @@ OFFERS.push(
     country: "BR",
     thumbnailHue: 45,
     gradient: ["#D97706", "#6E56CF"],
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80",
+    thumb: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80",
     bullets: ["Custódia 100% regulada", "Comece com R$ 50", "Liquidez diária"],
     cta: "Quero proteger meu dinheiro",
     funnel: [

@@ -34,7 +34,12 @@ from urllib.parse import urlencode
 
 import httpx
 
-from .realtime_producer import GRADIENTS
+from .realtime_producer import (
+    GRADIENTS,
+    cover_image,
+    looks_like_image,
+    looks_like_video,
+)
 
 # Showcase público de native ads usado como fonte de web-scrape por padrão.
 # Pode ser sobrescrito por ``base_url`` (ex.: um portal interno de transparência).
@@ -290,6 +295,12 @@ class NativeAdsLibrary:
             or d.get("url")
             or d.get("adUrl")
             or "",
+            image=d.get("landingPageUrl")
+            or d.get("imageUrl")
+            or d.get("image")
+            or d.get("url")
+            or "",
+            video="",
         )
 
 
@@ -428,6 +439,12 @@ class NativeAdsLibrary:
             or d.get("url")
             or d.get("adUrl")
             or "",
+            image=d.get("landingPageUrl")
+            or d.get("imageUrl")
+            or d.get("image")
+            or d.get("url")
+            or "",
+            video="",
         )
 
     def _finalize(
@@ -442,6 +459,8 @@ class NativeAdsLibrary:
         start: datetime | None,
         impr: int,
         snapshot: str,
+        image: str = "",
+        video: str = "",
     ) -> dict:
         longevity = max(1, (_now() - start).days) if start else 1
         has_video = fmt == "video"
@@ -463,6 +482,9 @@ class NativeAdsLibrary:
             "country": country,
             "thumbnailHue": _hue_from_id(uid),
             "gradient": GRADIENTS[hash(uid) % len(GRADIENTS)],
+            "image": image if looks_like_image(image) else cover_image(uid, "native"),
+            "thumb": image if looks_like_image(image) else cover_image(uid, "native"),
+            "videoUrl": video if looks_like_video(video) else "",
             "bullets": bullets or ["Criativo coletado da Native Ad Library"],
             "cta": cta,
             "funnel": [
