@@ -31,7 +31,7 @@ export function AnalyticsDashboard() {
   useEffect(() => {
     let alive = true;
     if (!isApiConfigured()) return;
-    getMetrics({ simulate: true })
+    getMetrics({ simulate: false })
       .then((m) => {
         if (alive && m) {
           setMetrics(m);

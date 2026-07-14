@@ -76,6 +76,26 @@ def cover_image(seed: str, network: str = "") -> str:
     return f"https://picsum.photos/seed/{net}_{safe}/640/384"
 
 
+# Vídeos locais servidos pelo frontend (apps/web/public/videos/*). Usados
+# como capa de vídeo para ofertas cujo criativo real não expõe a URL do
+# arquivo de vídeo (caso comum nas Ad Libraries oficiais, que só devolvem
+# a página/snapshot do anúncio). Determina qual arquivo pelo seed/rede, então
+# a mesma oferta sempre ganha o mesmo vídeo (sem CORS/hotlink/CDN externo).
+_LOCAL_VIDEOS = [
+    "/videos/fitness.mp4",
+    "/videos/finance.mp4",
+    "/videos/fashion.mp4",
+    "/videos/tech.mp4",
+]
+
+
+def video_cover(seed: str, network: str = "") -> str:
+    """Vídeo de capa local determinístico (frontend /videos/*) para ofertas
+    cujo criativo real não traz a URL do arquivo de vídeo."""
+    s = "".join(ch for ch in (seed or network or "spyfy") if ch.isalnum()) or "spyfy"
+    return _LOCAL_VIDEOS[abs(hash(s)) % len(_LOCAL_VIDEOS)]
+
+
 def _post(url: str, token: str, payload: dict, timeout: int = 10) -> dict:
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST")

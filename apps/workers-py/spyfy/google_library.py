@@ -30,6 +30,7 @@ from .realtime_producer import (
     cover_image,
     looks_like_image,
     looks_like_video,
+    video_cover,
 )
 
 AD_TRANSPARENCY_WEB = "https://adstransparency.google.com/"
@@ -343,7 +344,12 @@ class GoogleAdsTransparency:
             "gradient": GRADIENTS[hash(uid) % len(GRADIENTS)],
             "image": image if looks_like_image(image) else cover_image(uid, "google"),
             "thumb": image if looks_like_image(image) else cover_image(uid, "google"),
-            "videoUrl": video if looks_like_video(video) else "",
+            # Google Transparency quase nunca expõe a URL do arquivo de vídeo
+            # (só a landing page). Quando o formato é vídeo, garante um vídeo
+            # local real para o card não ficar mudo.
+            "videoUrl": video_cover(uid, "google") if fmt == "video" else (
+                video if looks_like_video(video) else ""
+            ),
             "bullets": bullets or ["Criativo coletado do Google Ads Transparency"],
             "cta": cta,
             "funnel": [

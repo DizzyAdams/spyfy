@@ -36,7 +36,8 @@ from ..roi import AdSignals, NicheEconomics, estimate_offer
 from ..webhooks import DedupStore, parse_event, verify_webhook
 from ..payments import register_payment_routes
 from .schemas import (AgentRunRequest, EstimateRequest, EstimateResponse, Health,
-                      NotifyRequest, NotifyResponse, RagQueryRequest, WebhookAck)
+                      NotifyRequest, NotifyResponse, RagQueryRequest, RealAdsIngest,
+                      WebhookAck)
 
 
 class CloneRequest(BaseModel):
@@ -234,7 +235,7 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
         country: str = Query(default="BR"),
         limit: int = Query(default=24, ge=1, le=100),
         simulate: bool = Query(
-            default=True,
+            default=False,
             description="True=fallback estruturado offline; False=tenta Ad Library real (precisa token)",
         ),
         token: str = Query(default="", description="Token da Ad Library (Meta) quando simulate=false"),
@@ -258,11 +259,109 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
             "offers": offers,
         }
 
+    @app.post("/v1/ingest")
+    def ingest(
+        niche: str = Query(default="keto", description="Nicho a raspar"),
+        network: str = Query(default="meta", description="meta|tiktok|google|native"),
+        country: str = Query(default="BR"),
+        limit: int = Query(default=10, ge=1, le=50),
+    ) -> dict:
+        """Roda a ferramenta headless própria (browser_scraper) para popular o
+        cache de anúncios REAIS. Sem browser/sessão disponível, retorna
+        ``scraped: 0`` (pipeline continua funcional via fallback)."""
+        from ..browser_scraper import scrape_native_ads, BrowserScrapeUnavailable
+
+        try:
+            offers = scrape_native_ads(niche, network, country, limit)
+            return {
+                "ok": True,
+                "scraped": len(offers),
+                "network": network,
+                "niche": niche,
+                "source": "browser_scraper",
+                "sample": offers[:3],
+            }
+        except BrowserScrapeUnavailable as e:
+            return {"ok": False, "scraped": 0, "reason": str(e),
+                    "network": network, "niche": niche}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "scraped": 0, "reason": repr(e),
+                    "network": network, "niche": niche}
+
+    @app.post("/v1/ingest/real")
+    def ingest_real(payload: "RealAdsIngest"):
+        """Ingere anúncios nativos REAIS na loja do SpyFy.
+
+        Dois modos (competidor: recolha real via sessão logada ou dump):
+          A) cookie de sessão logada (Meta) + nicho -> roda browser_scraper com
+             a sessão autenticada e grava os cards reais. Requer browser no env.
+          B) corpo ``{ "ads": [ {headline, advertiser, network, niche,
+             country, image, videoUrl, format, pageUrl, cta}, ... ] }`` -> grava
+             direto. Caminho que funciona em qualquer deploy (Vercel), bastando
+             colar um lote de anúncios nativos coletados.
+
+        Sempre retorna 200 (não quebra o pipeline); `added` diz quantos entraram.
+        """
+        from ..real_ads_store import add_real_ads, count as _cnt
+
+        ads = payload.ads
+        if isinstance(ads, list) and ads:
+            added = add_real_ads(ads)
+            return {"ok": True, "added": added, "source": "dump",
+                    "total_real": _cnt()}
+
+        cookie = payload.cookie or payload.session_cookie or ""
+        niche = payload.niche or "keto"
+        network = payload.network or "meta"
+        if cookie:
+            try:
+                from ..browser_scraper import scrape_native_ads_session
+                offers = scrape_native_ads_session(
+                    niche, network, cookie, country="BR", limit=20)
+                added = add_real_ads(offers)
+                return {"ok": True, "added": added, "source": "session",
+                        "total_real": _cnt(),
+                        "network": network, "niche": niche}
+            except Exception as e:  # noqa: BLE001
+                return {"ok": False, "added": 0, "reason": repr(e),
+                        "network": network, "niche": niche}
+
+        return {"ok": False, "added": 0,
+                "reason": "envie 'ads' (dump) ou 'cookie' (sessão logada)"}
+
+    @app.get("/v1/ingest/status")
+    def ingest_status() -> dict:
+        """Quantos anúncios nativos REAIS estão na loja."""
+        from ..real_ads_store import count, load_all
+        ads = load_all()
+        by_net = {}
+        for a in ads:
+            by_net[a.get("network", "meta")] = by_net.get(a.get("network", "meta"), 0) + 1
+        return {"ok": True, "real_ads": count(), "byNetwork": by_net}
+
+
+    @app.get("/v1/cron/warm")
+    def cron_warm() -> dict:
+        """Aquecimento periódico do feed (Vercel Cron a cada 30min).
+
+        Re-minera as redes principais via discover_offers (fallback
+        estruturado offline-safe) para manter o feed sempre populado e
+        exercita a rota /v1/metrics. Não quebra se uma rede falhar.
+        """
+        try:
+            for key in ("keto", "finance", "beauty", "marketing"):
+                discover_offers(niche=key, limit=12, simulate=True)
+            # exercita agregação de métricas (offline-safe)
+            compute_metrics(discover_offers(niche="finance", limit=24, simulate=True))
+            return {"ok": True, "warmed": True}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "reason": repr(e)}
+
     @app.get("/v1/metrics")
     def metrics(
         niche: str | None = Query(default=None),
         country: str = Query(default="BR"),
-        simulate: bool = Query(default=True),
+        simulate: bool = Query(default=False),
         token: str = Query(default=""),
     ) -> dict:
         """Métricas de mercado agregadas (redes, nichos, sinais, ROI, top escalando)."""

@@ -2,5 +2,8 @@
   "version": 2,
   "functions": {
     "api/index.py": { "maxDuration": 60 }
-  }
+  },
+  "crons": [
+    { "path": "/v1/cron/warm", "schedule": "*/30 * * * *" }
+  ]
 }

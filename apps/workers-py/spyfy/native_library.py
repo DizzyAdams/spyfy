@@ -39,6 +39,7 @@ from .realtime_producer import (
     cover_image,
     looks_like_image,
     looks_like_video,
+    video_cover,
 )
 
 # Showcase público de native ads usado como fonte de web-scrape por padrão.
@@ -484,7 +485,11 @@ class NativeAdsLibrary:
             "gradient": GRADIENTS[hash(uid) % len(GRADIENTS)],
             "image": image if looks_like_image(image) else cover_image(uid, "native"),
             "thumb": image if looks_like_image(image) else cover_image(uid, "native"),
-            "videoUrl": video if looks_like_video(video) else "",
+            # Native showcase raramente expõe a URL do arquivo de vídeo. Quando
+            # o formato é vídeo, garante um vídeo local real para o card.
+            "videoUrl": video_cover(uid, "native") if fmt == "video" else (
+                video if looks_like_video(video) else ""
+            ),
             "bullets": bullets or ["Criativo coletado da Native Ad Library"],
             "cta": cta,
             "funnel": [

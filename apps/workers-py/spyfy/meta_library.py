@@ -29,6 +29,7 @@ from .realtime_producer import (
     cover_image,
     looks_like_image,
     looks_like_video,
+    video_cover,
 )
 
 AD_LIBRARY_WEB = "https://www.facebook.com/ads/library/"
@@ -137,7 +138,8 @@ class MetaAdLibrary:
         client: httpx.Client | None = None,
         proxies: str | None = None,
     ) -> None:
-        self.access_token = access_token or ""
+        import os
+        self.access_token = access_token or os.getenv("META_ACCESS_TOKEN", "")
         self.country = country
         self.timeout = timeout
         self._client = client
@@ -204,6 +206,11 @@ class MetaAdLibrary:
                     "publisher_platforms",
                     "snapshot_url",
                     "ad_snapshot_url",
+                    # MÍDIA REAL + URL de destino (CTA) do criativo. Sem isto o
+                    # SpyFy renderizaria placeholders falsos em vez do vídeo/
+                    # imagem/link verdadeiros do anúncio.
+                    "ad_creatives{url,video_url,thumbnail_url,link_url,body}",
+                    "landing_page_url",
                 ]
             ),
             "limit": str(min(limit, 100)),
@@ -335,7 +342,38 @@ class MetaAdLibrary:
         impr = _parse_impressions(d.get("impressions"))
         country = str(d.get("ad_delivery_country") or self.country or "BR")
         fmt = _infer_format(d)
-        snapshot = d.get("snapshot_url") or d.get("ad_snapshot_url") or ""
+
+        # ---- MÍDIA REAL + LINK DE DESTINO (CTA) ----
+        # A Ad Library devolve o criativo aninhado em `ad_creatives` (lista).
+        # Extraímos a imagem/vídeo reais e a URL de destino (link_url) do
+        # criativo. Quando ausente, caímos no snapshot/landing_page_url.
+        creative = (d.get("ad_creatives") or [])
+        if isinstance(creative, list):
+            creative = creative[0] if creative else {}
+        creative = creative or {}
+        real_image = creative.get("url") or creative.get("thumbnail_url") or ""
+        real_video = creative.get("video_url") or ""
+        # O `link` (destino real da oferta) vem do criativo ou da landing page.
+        link = (
+            creative.get("link_url")
+            or d.get("landing_page_url")
+            or d.get("snapshot_url")
+            or d.get("ad_snapshot_url")
+            or ""
+        )
+        snapshot = (
+            d.get("snapshot_url")
+            or d.get("ad_snapshot_url")
+            or d.get("landing_page_url")
+            or ""
+        )
+
+        # Preferir a mídia real quando ela for uma URL de imagem/vídeo direta;
+        # caso contrário mantemos o snapshot como fallback p/ o _finalize.
+        image = real_image if looks_like_image(real_image) else (snapshot or real_image)
+        video = real_video if looks_like_video(real_video) else (
+            snapshot if fmt == "video" else ""
+        )
         return self._finalize(
             uid=aid,
             headline=headline,
@@ -346,8 +384,9 @@ class MetaAdLibrary:
             start=start,
             impr=impr,
             snapshot=snapshot,
-            image=snapshot,
-            video="" if fmt != "video" else snapshot,
+            link=link,
+            image=image,
+            video=video,
         )
 
     def _web_node_to_offer(self, d: dict[str, Any]) -> dict | None:
@@ -373,6 +412,14 @@ class MetaAdLibrary:
             or d.get("url")
             or ""
         )
+        link = (
+            d.get("landingPageUrl")
+            or d.get("landing_page_url")
+            or d.get("linkUrl")
+            or d.get("url")
+            or snapshot
+            or ""
+        )
         return self._finalize(
             uid=aid,
             headline=headline,
@@ -383,6 +430,7 @@ class MetaAdLibrary:
             start=start,
             impr=impr,
             snapshot=snapshot,
+            link=link,
             image=snapshot,
             video="" if fmt != "video" else snapshot,
         )
@@ -399,6 +447,7 @@ class MetaAdLibrary:
         start: datetime | None,
         impr: int,
         snapshot: str,
+        link: str = "",
         image: str = "",
         video: str = "",
     ) -> dict:
@@ -409,6 +458,9 @@ class MetaAdLibrary:
             impr = int(200_000 + score * 60_000)
         bullets = _bullets_from_body(body)
         cta = "Ver anúncio" if snapshot else "Ver oferta"
+        # `link` é o DESTINO REAL da oferta (landing page / snapshot do anúncio).
+        # Sempre presente quando temos snapshot; o frontend abre em nova aba.
+        real_link = link or snapshot or ""
         return {
             "id": f"meta_{uid}",
             "headline": headline.strip()[:160] or "Oferta do Meta Ad Library",
@@ -424,9 +476,12 @@ class MetaAdLibrary:
             "gradient": GRADIENTS[hash(uid) % len(GRADIENTS)],
             "image": image if looks_like_image(image) else cover_image(uid, "meta"),
             "thumb": image if looks_like_image(image) else cover_image(uid, "meta"),
-            "videoUrl": video if looks_like_video(video) else "",
+            "videoUrl": video if looks_like_video(video) else (
+                video_cover(uid, "meta") if fmt == "video" else ""
+            ),
             "bullets": bullets or ["Criativo coletado da Meta Ad Library"],
             "cta": cta,
+            "link": real_link,
             "funnel": [
                 {"type": "lp", "label": "Landing Page"},
                 {"type": "checkout", "label": "Checkout"},

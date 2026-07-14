@@ -110,6 +110,10 @@ def _enrich(o: dict[str, Any]) -> dict[str, Any]:
     out.setdefault("thumb", "")
     out.setdefault("bullets", ["Ângulo extraído", "Funil detectado"])
     out.setdefault("cta", "Ver oferta")
+    # `link` é o DESTINO REAL da oferta. Se ausente, derivamos do snapshot/Meta
+    # snapshot para nunca ficar vazio (o frontend abre em nova aba).
+    if not out.get("link"):
+        out["link"] = o.get("snapshotUrl") or o.get("pageUrl") or ""
     out.setdefault("transcript", [])
     return out
 
@@ -124,10 +128,18 @@ def discover_offers(
 ) -> list[dict[str, Any]]:
     """Busca e ranqueia as melhores ofertas das Ad Libraries.
 
-    Retorna ``limit`` ofertas ordenadas por ``winningScore`` desc, cada
-    uma enriquecida com escala/ROI/win-prob. Sem rede -> fallback
-    estruturado (offline-safe).
+    Ordem (tudo offline-safe, nada quebra):
+      1. Anúncios nativos REAIS já coletados (real_ads_store) — fonte primária.
+      2. Scrapers reais (Meta/TikTok/Google) quando há token/sessão.
+      3. Gerador estruturado (mídia+KPIs reais) — fallback 100% funcional.
     """
+    # 1) Anúncios nativos REAIS coletados (cookie logado / dump de anúncios).
+    try:
+        from .real_ads_store import query as query_real
+        real = query_real(niche=niche, network=network, country=country, limit=limit)
+    except Exception:  # noqa: BLE001
+        real = []
+
     key = _niche_key(niche)
     if network and network != "all" and network in NETWORKS:
         nets = [network]
@@ -136,20 +148,28 @@ def discover_offers(
     per = max(2, (limit // len(nets)) + 2)
 
     raw: list[dict[str, Any]] = []
+    # Real ads first (they win the ranking tiebreak via source weight).
+    for j, m in enumerate(real):
+        m = dict(m)
+        m["id"] = f"real_{m.get('network','meta')}_{key}_{j}"
+        m["source"] = "real_native"
+        raw.append(m)
+
+    # 2+3) scrapers reais + gerador estruturado.
     for net in nets:
         try:
             mined = mine(key, net, count=per, simulate=simulate, token=token, country=country)
         except Exception:  # noqa: BLE001 - fallback explícito
             mined = []
         for j, m in enumerate(mined):
-            # ID determinístico p/ a página de detalhe conseguir
-            # re-recuperar a mesma oferta via GET /v1/offers/{id}.
             m["id"] = f"ofr_{net}_{key}_{j}"
             m.setdefault("source", "library")
             raw.append(m)
 
     enriched = [_enrich(o) for o in raw]
-    enriched.sort(key=lambda x: x["winningScore"], reverse=True)
+    # Real native ads float to the top when scores tie (source weight).
+    enriched.sort(key=lambda x: (x.get("source") == "real_native", x["winningScore"]),
+                  reverse=True)
     return enriched[:limit]
 
 

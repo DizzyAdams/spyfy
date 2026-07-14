@@ -31,9 +31,10 @@ from .realtime_producer import (
     cover_image,
     looks_like_image,
     looks_like_video,
+    video_cover,
 )
 
-AD_LIBRARY_WEB = "https://ads.tiktok.com/ad-library"
+AD_LIBRARY_WEB = "https://ads.tiktok.com/ad-library/"
 AD_LIBRARY_API = "https://ads.tiktok.com/open_api/v1.3/ad_library/get/"
 
 _MEDIA_TO_FORMAT = {
@@ -140,7 +141,8 @@ class TikTokAdLibrary:
         client: httpx.Client | None = None,
         proxies: str | None = None,
     ) -> None:
-        self.access_token = access_token or ""
+        import os
+        self.access_token = access_token or os.getenv("TIKTOK_ACCESS_TOKEN", "")
         self.country = country
         self.timeout = timeout
         self._client = client
@@ -346,6 +348,9 @@ class TikTokAdLibrary:
             or d.get("url")
             or ""
         )
+        real_image = d.get("coverUrl") or d.get("thumbnailUrl") or d.get("imageUrl") or d.get("cover_image_url") or ""
+        real_video = d.get("videoUrl") or d.get("videoPlayUrl") or d.get("video_url") or ""
+        link = d.get("landingPageUrl") or d.get("landing_page_url") or snapshot or ""
         return self._finalize(
             uid=aid,
             headline=headline,
@@ -356,11 +361,10 @@ class TikTokAdLibrary:
             start=start,
             impr=impr,
             snapshot=snapshot,
-            image="",
-            video="" if fmt != "video" else snapshot,
+            link=link,
+            image=real_image,
+            video=real_video,
         )
-
-
 
     def _api_to_offer(self, d: dict[str, Any]) -> dict | None:
         aid = str(d.get("ad_id") or d.get("adId") or d.get("id") or "")
@@ -382,6 +386,9 @@ class TikTokAdLibrary:
             or d.get("url")
             or ""
         )
+        real_image = d.get("thumbnail_url") or d.get("cover_image_url") or d.get("image_url") or d.get("coverUrl") or ""
+        real_video = d.get("video_url") or d.get("videoUrl") or ""
+        link = d.get("landing_page_url") or d.get("landingPageUrl") or snapshot or ""
         return self._finalize(
             uid=aid,
             headline=headline,
@@ -392,8 +399,9 @@ class TikTokAdLibrary:
             start=start,
             impr=impr,
             snapshot=snapshot,
-            image="",
-            video="" if fmt != "video" else snapshot,
+            link=link,
+            image=real_image,
+            video=real_video,
         )
 
     def _finalize(
@@ -408,6 +416,7 @@ class TikTokAdLibrary:
         start: datetime | None,
         impr: int,
         snapshot: str,
+        link: str = "",
         image: str = "",
         video: str = "",
     ) -> dict:
@@ -438,9 +447,12 @@ class TikTokAdLibrary:
             "gradient": GRADIENTS[hash(uid) % len(GRADIENTS)],
             "image": image if looks_like_image(image) else cover_image(uid, "tiktok"),
             "thumb": image if looks_like_image(image) else cover_image(uid, "tiktok"),
-            "videoUrl": video if looks_like_video(video) else "",
+            "videoUrl": video if looks_like_video(video) else (
+                video_cover(uid, "tiktok") if fmt == "video" else ""
+            ),
             "bullets": bullets or ["Criativo coletado da TikTok Ad Library"],
             "cta": cta,
+            "link": link or snapshot or "",
             "funnel": [
                 {"type": "lp", "label": "Landing Page"},
                 {"type": "checkout", "label": "Checkout"},

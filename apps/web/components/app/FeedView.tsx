@@ -148,7 +148,7 @@ export function FeedView() {
   useEffect(() => {
     let alive = true;
     if (!isApiConfigured()) return;
-    getOffers({ limit: 120, simulate: true })
+    getOffers({ limit: 120, simulate: false })
       .then((res) => {
         if (alive && res && res.offers.length) {
           setApiOffers(res.offers);

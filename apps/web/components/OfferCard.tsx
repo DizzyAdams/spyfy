@@ -86,14 +86,15 @@ export function OfferCard({
     clearTimeout(cloneTimeout.current);
     cloneTimeout.current = setTimeout(() => {
       setCloned(false);
-      window.location.href = href;
-    }, 2000);
+      window.open(dest, "_blank", "noopener,noreferrer");
+    }, 1000);
   };
 
   const band = scoreBand(offer.winningScore);
   const Icon = bandIcon[band.key];
   const net = NETWORKS.find((n) => n.key === offer.network);
   const href = `/app/offer/${offer.id}`;
+  const dest = offer.link || href;
   // Índice de escala + faixa de gasto diário — derivados 100% no cliente.
   const scale = scaleIndex(offer);
   const spend = spendBand(offer.estImpressions, offer.longevityDays);
@@ -253,11 +254,22 @@ export function OfferCard({
 
           {/* Quick actions */}
           <div className="flex items-center gap-2 pt-1">
+            <a
+              href={dest}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="btn btn-primary flex-1 !justify-center !py-2 !text-[13px] focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+            >
+              <ExternalLink size={14} aria-hidden />
+              {offer.cta || "Ver oferta"}
+            </a>
             <button
               type="button"
               onClick={handleClone}
               disabled={cloned}
-              className="btn btn-primary flex-1 !justify-center !py-2 !text-[13px] focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+              className="btn btn-ghost !px-3 !py-2 focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+              title="Abrir o destino real da oferta"
             >
               {cloned ? (
                 <motion.span
@@ -267,7 +279,7 @@ export function OfferCard({
                   className="inline-flex items-center gap-1.5"
                 >
                   <Check size={14} aria-hidden />
-                  Clonado!
+                  Aberto!
                 </motion.span>
               ) : (
                 <>

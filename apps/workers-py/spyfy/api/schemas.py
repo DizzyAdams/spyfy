@@ -84,3 +84,18 @@ class RagQueryRequest(BaseModel):
 class ErrorBody(BaseModel):
     code: str
     message: str
+
+
+class RealAdsIngest(BaseModel):
+    """Corpo de POST /v1/ingest/real.
+
+    Dois modos (ver app.py):
+      - ads: lista de anúncios nativos REAIS coletados (dump) -> grava direto.
+      - cookie / session_cookie: sessão logada (Meta) p/ raspar de verdade.
+    """
+
+    ads: list[dict] | None = None
+    cookie: str | None = None
+    session_cookie: str | None = None
+    niche: str | None = "keto"
+    network: str | None = "meta"

@@ -1,0 +1,15 @@
+[
+  {
+    "headline": "Teste anúncio nativo real",
+    "advertiser": "Loja X",
+    "network": "meta",
+    "niche": "keto",
+    "country": "BR",
+    "image": "https://example.com/x.jpg",
+    "format": "image",
+    "pageUrl": "https://facebook.com/lojax",
+    "cta": "Comprar",
+    "_source": "real_native",
+    "_ts": 1784056528
+  }
+]

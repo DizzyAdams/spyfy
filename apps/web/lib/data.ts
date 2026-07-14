@@ -19,6 +19,10 @@ export interface Offer {
   videoUrl?: string; // direct mp4/webm of the creative video (plays inline)
   bullets: string[];
   cta: string;
+  /** DESTINO REAL da oferta (landing page / snapshot do anúncio). O card e o
+   *  detalhe abrem este link em nova aba. Vem do backend; nunca vazio após
+   *  o enriquecimento (offers_service garante fallback a partir de snapshotUrl). */
+  link?: string;
   funnel: { type: string; label: string; stack?: string }[];
   vslSeconds: number;
   transcript: { t: string; label: string; text: string }[];

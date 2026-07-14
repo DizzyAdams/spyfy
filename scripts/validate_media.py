@@ -1,10 +1,13 @@
-"""Validacao automatica de midia das ofertas (SpyFy).
+"""
+Validacao automatica de midia das ofertas (SpyFy).
 
-Para CADA oferta (demo do frontend, simulador do backend, e guards das
-bibliotecas reais) confere se `image` / `videoUrl` apontam para uma
-URL de midia REAL e acessive (HTTP < 400 + content-type correto).
-Falha (exit 1) se alguma oferta ficar sem imagem valida ou com
-videoUrl apontando para uma pagina web em vez de um arquivo de video.
+Para CADA oferta (demo do frontend, simulador do backend, scrapers reais
+e guards das bibliotecas) confere se `image` / `videoUrl` apontam para uma
+URL de midia REAL e acessivel (HTTP < 400 + content-type correto, ou
+arquivo local existente em apps/web/public).
+
+Falha (exit 1) se alguma oferta ficar sem imagem valida ou se uma oferta
+cujo formato e' video ficar sem videoUrl valido.
 
 Uso:
     python scripts/validate_media.py
@@ -68,11 +71,6 @@ def rec(kind: str, ident: str, ok: bool, detail: str) -> None:
 # 1) Demo do frontend (apps/web/lib/data.ts) -------------------------------
 def validate_demo() -> None:
     txt = WEB_DATA.read_text(encoding="utf-8")
-    offers = re.split(r"\n  \{", txt)  # separa blocos de oferta
-    # coleta (id, image, videoUrl) via regex simples
-    ids = re.findall(r'id:\s*"([^"]+)"', txt)
-    imgs = dict(re.findall(r'image:\s*"([^"]+)"', txt)) if False else None
-    # pega pares image:/videoUrl: por oferta usando captura de bloco
     blocks = re.findall(
         r'id:\s*"([^"]+)".*?image:\s*"([^"]+)".*?'
         r'(?:videoUrl:\s*"([^"]*)")?',
@@ -99,7 +97,6 @@ def validate_simulator() -> None:
 
     niches = ["keto", "finance", "beauty"]
     nets = ["meta", "tiktok", "google", "native", "youtube", "pinterest"]
-    bad = 0
     for niche in niches:
         for net in nets:
             for i in range(4):
@@ -110,18 +107,41 @@ def validate_simulator() -> None:
                 vid = o.get("videoUrl") or ""
                 ok_i, msg_i = check(img, IMG_TYPES)
                 rec("sim img", oid, ok_i, f"{msg_i} <- {img[:50]}")
-                if not ok_i:
-                    bad += 1
                 if fmt == "video":
                     ok_v, msg_v = check(vid, VID_TYPES)
                     rec("sim vid", oid, ok_v, f"{msg_v} <- {vid[:50]}")
-                    if not ok_v:
-                        bad += 1
-    if bad == 0:
-        print(f"[OK  ] simulador: todas as midias acessiveis ({len(niches)*len(nets)*4} ofertas)")
 
 
-# 3) Guards das bibliotecas reais -----------------------------------------
+# 3) Scrapers REAIS (mine simulate=False) — ofertas de verdade ----------
+def validate_real_scrapers() -> None:
+    from spyfy.scraper_bridge import mine
+
+    nets = ["meta", "tiktok", "google", "native"]
+    for net in nets:
+        try:
+            offers = mine("keto", net, count=4, simulate=False)
+        except Exception as exc:  # noqa: BLE001
+            rec("real", f"{net} (erro)", False, f"mine levantou: {exc}")
+            continue
+        if not offers:
+            rec("real", f"{net} (vazio)", False, "nenhuma oferta real")
+            continue
+        for o in offers:
+            oid = o.get("id", net)
+            img = o.get("image") or ""
+            fmt = o.get("format")
+            vid = o.get("videoUrl") or ""
+            ok_i, msg_i = check(img, IMG_TYPES)
+            rec(f"real img {net}", oid, ok_i, f"{msg_i} <- {img[:40]}")
+            if fmt == "video":
+                ok_v, msg_v = check(vid, VID_TYPES)
+                rec(f"real vid {net}", oid, ok_v, f"{msg_v} <- {vid[:40]}")
+            else:
+                # mesmo sem ser video, nao pode ficar quebrado
+                rec(f"real fmt {net}", oid, ok_i, f"formato={fmt}")
+
+
+# 4) Guards das bibliotecas reais -----------------------------------------
 def validate_guards() -> None:
     from spyfy.native_library import NativeAdsLibrary
 
@@ -138,12 +158,24 @@ def validate_guards() -> None:
     rec("guard native no-video", "native_x1", o.get("videoUrl") == "",
          f"videoUrl='{o.get('videoUrl')}' (esperado vazio)")
 
+    # native FORMATO VIDEO -> deve vir com videoUrl local valido (fix)
+    o2 = n._finalize(
+        uid="x2", headline="h", advertiser="a", country="BR", body="b",
+        fmt="video", start=None, impr=1000, snapshot="https://x.com/page",
+        image="", video="",
+    )
+    vid2 = o2.get("videoUrl") or ""
+    ok_v, msg_v = check(vid2, VID_TYPES)
+    rec("guard native video", "native_x2", ok_v, f"{msg_v} <- {vid2[:40]}")
+
 
 def main() -> int:
     print("== Validação de mídia das ofertas ==\n")
     validate_demo()
     print()
     validate_simulator()
+    print()
+    validate_real_scrapers()
     print()
     validate_guards()
 
@@ -154,7 +186,7 @@ def main() -> int:
         for r in fails:
             print(f"  - [{r[0]}] {r[1]} :: {r[3]}")
         return 1
-    print("100% das ofertas com midia real e acessiveL. PRONTO P/ DEPLOY.")
+    print("100% das ofertas com midia real e acessivel. PRONTO P/ DEPLOY.")
     return 0
 
 
