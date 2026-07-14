@@ -58,7 +58,7 @@ export interface NotifyResponse {
   failed: string[];
 }
 
-const FALLBACK_API = "https://spyfyv1prod.vercel.app";
+const FALLBACK_API = "https://workers-py.vercel.app";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || FALLBACK_API).replace(/\/$/, "");
 
 /** Verdadeiro quando a env NEXT_PUBLIC_API_URL está definida. */

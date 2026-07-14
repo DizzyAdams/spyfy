@@ -258,15 +258,15 @@ function generateOffer() {
   const network = pick(NETWORKS);
   const id = `live_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
   const format = pick(FORMATS);
-  // Toda oferta carrega uma capa real (foto) + vídeo inline quando é 'video'.
-  // CDNs públicos confiáveis (sem bloqueio de hotlink/CORS) para provar
-  // renderização de <img> e <video> end-to-end no feed e no detalhe.
+  // Toda oferta carrega uma capa (picsum, CDN confiável) + vídeo inline
+  // local (/videos/*, servido pelo próprio frontend) quando é 'video' — sem
+  // dependência de CDN de vídeo externo, bloqueio de hotlink ou CORS.
   const photo = `https://picsum.photos/seed/${id}/640/384`;
   const VIDEOS = [
-    "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4",
-    "https://www.w3schools.com/html/mov_bbb.mp4",
-    "https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_1MB.mp4",
-    "https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_1MB.mp4",
+    "/videos/fitness.mp4",
+    "/videos/finance.mp4",
+    "/videos/fashion.mp4",
+    "/videos/tech.mp4",
   ];
   const video = format === "video" ? pick(VIDEOS) : "";
   return {

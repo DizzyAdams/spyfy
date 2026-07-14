@@ -54,13 +54,15 @@ def build_offer(niche: str, network: str, i: int) -> dict:
     vsl_min = random.randint(5, 15)
     format_type = random.choice(["video", "video", "image", "carousel"])
     
-    # Creative de demonstração — URLs públicas e confiáveis (CDN) que rodam
-    # inline como <video> (mp4) ou <img> (foto), sem bloqueio de hotlink/CORS.
+    # Creative de demonstração — vídeos locais em /videos/* (servidos pelo
+    # próprio frontend em `public/`), então não há dependência de CDN externo,
+    # bloqueio de hotlink ou CORS. As imagens seguem via Unsplash (CDN
+    # público e confiável). Mantenha 1 arquivo .mp4 em public/videos por nicho.
     NICHE_VIDEO = {
-        "keto": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4",
-        "finance": "https://www.w3schools.com/html/mov_bbb.mp4",
-        "beauty": "https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_1MB.mp4",
-        "marketing": "https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_1MB.mp4",
+        "keto": "/videos/fitness.mp4",
+        "finance": "/videos/finance.mp4",
+        "beauty": "/videos/fashion.mp4",
+        "marketing": "/videos/tech.mp4",
     }
     NICHE_IMAGE = {
         "keto": [
