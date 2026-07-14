@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
-  ArrowLeft, Copy, Bookmark, Bell, Play, Check, Loader2, Download, ExternalLink, ListChecks,
+  ArrowLeft, Copy, Bookmark, BookmarkCheck, Bell, Play, Check, Loader2, Download, ExternalLink, ListChecks,
 } from "lucide-react";
 import { Offer, NETWORKS } from "@/lib/data";
 import { scoreBand, formatNumber, cn } from "@/lib/utils";
@@ -17,6 +17,33 @@ export function OfferDetail({ offer }: { offer: Offer }) {
   const band = scoreBand(offer.winningScore);
   const net = NETWORKS.find((n) => n.key === offer.network);
   const reduce = useReducedMotion();
+  const [saved, setSaved] = useState<Set<string>>(new Set());
+  const saveTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("spyfy_saved");
+      if (raw) setSaved(new Set(JSON.parse(raw)));
+    } catch { /* corrupt storage */ }
+  }, []);
+
+  useEffect(() => {
+    clearTimeout(saveTimeout.current);
+    saveTimeout.current = setTimeout(() => {
+      localStorage.setItem("spyfy_saved", JSON.stringify([...saved]));
+    }, 300);
+    return () => clearTimeout(saveTimeout.current);
+  }, [saved]);
+
+  const toggleSave = () => {
+    setSaved((prev) => {
+      const next = new Set(prev);
+      if (next.has(offer.id)) next.delete(offer.id);
+      else next.add(offer.id);
+      return next;
+    });
+  };
+
   const [step, setStep] = useState(-1);
   const timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
@@ -113,7 +140,10 @@ export function OfferDetail({ offer }: { offer: Offer }) {
           </div>
 
           <div className="flex gap-2">
-            <button className="btn btn-ghost flex-1"><Bookmark size={15} /> Salvar</button>
+            <button onClick={toggleSave} className="btn btn-ghost flex-1">
+              {saved.has(offer.id) ? <BookmarkCheck size={15} className="text-[var(--accent)]" /> : <Bookmark size={15} />}
+              {saved.has(offer.id) ? "Salvo" : "Salvar"}
+            </button>
             <button className="btn btn-ghost flex-1"><Bell size={15} /> Alerta</button>
           </div>
         </div>

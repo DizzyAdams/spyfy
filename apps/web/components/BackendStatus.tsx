@@ -3,37 +3,40 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { getHealth, getVersion, isApiConfigured } from "@/lib/api";
 import { fadeIn } from "@/lib/motion";
 
 type State = "idle" | "loading" | "online" | "offline";
 
 /**
- * Pill de status do backend SpyFy (FastAPI). Consulta `/health` e
- * `/v1/version` da API configurada em NEXT_PUBLIC_API_URL e mostra o
- * estado ao vivo. Degrada graciosamente quando a API não está configurada
+ * Pill de status do backend SpyFy (FastAPI). Faz um fetch same-origin
+ * via `/api/health` (Next.js API route proxy) para evitar CORS, e mostra
+ * o estado ao vivo. Degrada graciosamente quando a API não está configurada
  * ou está fora do ar — nunca quebra a renderização.
  */
 export function BackendStatus({ className }: { className?: string }) {
-  const [state, setState] = useState<State>(
-    isApiConfigured() ? "loading" : "idle",
-  );
+  const [state, setState] = useState<State>("loading");
   const [version, setVersion] = useState("");
   const reduce = useReducedMotion();
 
   useEffect(() => {
-    if (!isApiConfigured()) {
-      setState("idle");
-      return;
-    }
     let alive = true;
     const probe = async () => {
-      const [health, ver] = await Promise.all([getHealth(), getVersion()]);
-      if (!alive) return;
-      if (health && health.status === "ok") {
-        setState("online");
-        setVersion(ver || health.version || "");
-      } else {
+      try {
+        const res = await fetch("/api/health");
+        const data = await res.json();
+        if (!alive) return;
+        if (data.status === "unconfigured") {
+          setState("idle");
+          setVersion("");
+        } else if (data.status === "ok") {
+          setState("online");
+          setVersion(data.version || "");
+        } else {
+          setState("offline");
+          setVersion(data.version || "");
+        }
+      } catch {
+        if (!alive) return;
         setState("offline");
       }
     };

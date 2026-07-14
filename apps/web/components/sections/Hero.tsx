@@ -54,9 +54,17 @@ export function Hero() {
           variants={v(staggerContainer)}
           className="max-w-xl"
         >
-          <motion.span variants={v(revealUp)} className="chip mb-6 !text-primary">
-            <Sparkles size={13} /> Ad intelligence + offer cloning com IA
-          </motion.span>
+          <motion.div
+            variants={v(revealUp)}
+            className="mb-6 flex flex-wrap items-center gap-2"
+          >
+            <span className="chip !text-primary">
+              <Sparkles size={13} /> Ad intelligence + offer cloning com IA
+            </span>
+            <span className="chip !border-primary/20 !bg-primary/5 !text-primary/70">
+              4 redes monitoradas
+            </span>
+          </motion.div>
 
           <div className="block overflow-hidden">
             <motion.h1
@@ -107,10 +115,13 @@ export function Hero() {
 
           <motion.dl
             variants={v(revealUp)}
-            className="mt-10 grid grid-cols-3 gap-4 border-t border-border/60 pt-6"
+            className="mt-10 grid grid-cols-4 gap-4 border-t border-border/60 pt-6"
           >
             <Stat label="anúncios indexados">
               <CountUp to={1} suffix="B+" />
+            </Stat>
+            <Stat label="redes cobertas">
+              <CountUp to={4} suffix="+" />
             </Stat>
             <Stat label="clone completo">
               <CountUp to={60} prefix="<" suffix="s" />

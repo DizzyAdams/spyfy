@@ -1,9 +1,11 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   Bookmark,
+  BookmarkCheck,
   Copy,
   Flame,
   TrendingUp,
@@ -36,6 +38,35 @@ export function OfferCard({
   isNew?: boolean;
 }) {
   const reduce = useReducedMotion();
+  const [saved, setSaved] = useState<Set<string>>(new Set());
+  const saveTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("spyfy_saved");
+      if (raw) setSaved(new Set(JSON.parse(raw)));
+    } catch { /* corrupt storage */ }
+  }, []);
+
+  useEffect(() => {
+    clearTimeout(saveTimeout.current);
+    saveTimeout.current = setTimeout(() => {
+      localStorage.setItem("spyfy_saved", JSON.stringify([...saved]));
+    }, 300);
+    return () => clearTimeout(saveTimeout.current);
+  }, [saved]);
+
+  const toggleSave = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSaved((prev) => {
+      const next = new Set(prev);
+      if (next.has(offer.id)) next.delete(offer.id);
+      else next.add(offer.id);
+      return next;
+    });
+  };
+
   const band = scoreBand(offer.winningScore);
   const Icon = bandIcon[band.key];
   const net = NETWORKS.find((n) => n.key === offer.network);
@@ -211,10 +242,15 @@ export function OfferCard({
             </MotionLink>
             <button
               type="button"
-              aria-label="Salvar oferta"
+              onClick={toggleSave}
+              aria-label={saved.has(offer.id) ? "Remover oferta" : "Salvar oferta"}
               className="btn btn-ghost !px-3 !py-2 focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
             >
-              <Bookmark size={14} aria-hidden />
+              {saved.has(offer.id) ? (
+                <BookmarkCheck size={14} aria-hidden className="text-[var(--accent)]" />
+              ) : (
+                <Bookmark size={14} aria-hidden />
+              )}
             </button>
           </div>
         </div>

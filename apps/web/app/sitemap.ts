@@ -8,9 +8,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/app",
     "/app/feed",
     "/app/analytics",
+    "/app/library",
+    "/app/alerts",
+    "/app/settings",
+    "/app/compare",
     "/app/offer/ofr_123",
     "/app/offer/ofr_204",
     "/app/offer/ofr_318",
+    "/app/offer/ofr_441",
+    "/app/offer/ofr_512",
+    "/app/offer/ofr_607",
   ];
 
   return routes.map((r) => ({

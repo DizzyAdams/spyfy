@@ -258,17 +258,17 @@ export function LibraryView() {
               }
               title={
                 activeTab === "saved"
-                  ? "No saved offers yet"
+                  ? "Nenhuma oferta salva"
                   : activeTab === "recent"
-                    ? "No recent offers"
-                    : "No archived offers"
+                    ? "Nenhuma oferta recente"
+                    : "Nenhuma oferta arquivada"
               }
               description={
                 activeTab === "saved"
-                  ? "Save winning offers from the Discovery Feed to build your library."
+                  ? "Salve ofertas vencedoras do Discovery Feed para construir sua biblioteca."
                   : activeTab === "recent"
-                    ? "Recently viewed offers will appear here."
-                    : "Archived offers will show up here after you archive them."
+                    ? "Ofertas visualizadas recentemente aparecerão aqui."
+                    : "Ofertas arquivadas aparecerão aqui depois de arquivá-las."
               }
               action={
                 activeTab === "saved"
