@@ -34,6 +34,7 @@ from ..notifiers import (AppriseAdapter, NotificationDispatcher, NovuAdapter,
                          NtfyAdapter, WebhookAdapter)
 from ..roi import AdSignals, NicheEconomics, estimate_offer
 from ..webhooks import DedupStore, parse_event, verify_webhook
+from ..payments import register_payment_routes
 from .schemas import (AgentRunRequest, EstimateRequest, EstimateResponse, Health,
                       NotifyRequest, NotifyResponse, RagQueryRequest, WebhookAck)
 
@@ -66,6 +67,9 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
     app.state.bus = bus
     app.state.dispatcher = dispatcher
     app.state.memory = None
+
+    # ── Payment routes (multi-gateway + anti-fraude) ─────────────
+    register_payment_routes(app)
 
     # CORS: permite que o frontend (Vercel em produção + localhost em dev)
     # chame a API a partir do navegador. Origens configuráveis via CORS_ORIGINS.

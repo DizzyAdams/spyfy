@@ -229,15 +229,18 @@ export const PRICING = [
   {
     name: "Free",
     price: "R$0",
+    priceValue: 0,
     period: "/mês",
     description: "Comece a explorar ofertas vencedoras.",
     features: ["20 buscas/dia", "1 clonagem/mês", "Rede Meta", "Score de vencedora"],
     highlight: false,
     cta: "Começar grátis",
+    checkoutUrl: "/app/feed",
   },
   {
     name: "Pro",
     price: "R$129",
+    priceValue: 129,
     period: "/mês",
     description: "Para media buyers e afiliados que escalam.",
     features: [
@@ -249,10 +252,12 @@ export const PRICING = [
     ],
     highlight: true,
     cta: "Assinar Pro",
+    checkoutUrl: "/app/checkout?plan=pro",
   },
   {
     name: "Agency",
     price: "R$349",
+    priceValue: 349,
     period: "/mês",
     description: "Para agências e equipes de performance.",
     features: [
@@ -264,6 +269,7 @@ export const PRICING = [
     ],
     highlight: false,
     cta: "Falar com vendas",
+    checkoutUrl: "/app/checkout?plan=agency",
   },
 ];
 
