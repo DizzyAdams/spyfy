@@ -61,6 +61,17 @@ def _fetch_html(browser, url: str, timeout: int = 25000) -> str:
                     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"),
         locale="pt-BR",
     )
+    
+    cookies_path = os.path.join(CACHE_DIR, "cookies.json")
+    if os.path.exists(cookies_path):
+        try:
+            with open(cookies_path, encoding="utf-8") as f:
+                cookies = json.load(f)
+                if isinstance(cookies, list):
+                    ctx.add_cookies(cookies)
+        except Exception:
+            pass
+
     page = ctx.new_page()
     page.goto(url, wait_until="domcontentloaded", timeout=timeout)
     page.wait_for_timeout(3000)
