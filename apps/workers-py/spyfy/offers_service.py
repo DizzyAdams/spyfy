@@ -104,6 +104,7 @@ def _enrich(o: dict[str, Any]) -> dict[str, Any]:
         }
     )
     # Campos obrigatórios do modelo Offer do front (fallbacks seguros).
+    out.setdefault("longevityDays", long if long > 0 else 30)
     out.setdefault("thumbnailHue", int(abs(hash(o.get("id", ""))) % 360))
     out.setdefault("gradient", list(GRADIENTS[0]))
     out.setdefault("image", "")
@@ -134,11 +135,13 @@ def discover_offers(
       3. Gerador estruturado (mídia+KPIs reais) — fallback 100% funcional.
     """
     # 1) Anúncios nativos REAIS coletados (cookie logado / dump de anúncios).
-    try:
-        from .real_ads_store import query as query_real
-        real = query_real(niche=niche, network=network, country=country, limit=limit)
-    except Exception:  # noqa: BLE001
-        real = []
+    real = []
+    if not simulate:
+        try:
+            from .real_ads_store import query as query_real
+            real = query_real(niche=niche, network=network, country=country, limit=limit)
+        except Exception:  # noqa: BLE001
+            real = []
 
     key = _niche_key(niche)
     if network and network != "all" and network in NETWORKS:
@@ -178,12 +181,28 @@ def get_offer_by_id(
 ) -> dict[str, Any] | None:
     """Recupera uma oferta específica por ID (determinístico).
 
-    Os IDs têm o formato ``ofr_{network}_{niche_key}_{i}``; re-mineramos
-    a rede/nicho e devolvemos o i-ésimo item enriquecido. Permite que
-    a página de detalhe do front recupere a mesma oferta clicada no feed.
+    Os IDs têm o formato ``ofr_{network}_{niche_key}_{i}`` ou ``real_{network}_{niche_key}_{i}``;
+    re-mineramos ou buscamos do banco de anúncios reais.
     """
     parts = offer_id.split("_")
-    if len(parts) < 4 or parts[0] != "ofr":
+    if len(parts) < 4:
+        return None
+    if parts[0] == "real":
+        try:
+            from .real_ads_store import query as query_real
+            _, net, key, idx_str = parts
+            idx = int(idx_str)
+            real = query_real(niche=key, network=net, country=country, limit=idx + 1)
+            if idx < len(real):
+                o = dict(real[idx])
+                o["id"] = offer_id
+                o["source"] = "real_native"
+                return _enrich(o)
+        except Exception:
+            pass
+        return None
+        
+    if parts[0] != "ofr":
         return None
     _, net, key, *rest = parts
     if net not in NETWORKS:
