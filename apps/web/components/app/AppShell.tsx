@@ -24,9 +24,9 @@ const MotionLink = motion.create(Link);
 const nav = [
   { href: "/app/feed", label: "Feed", icon: LayoutGrid },
   { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/app/feed", label: "Library", icon: Library },
-  { href: "/app/feed", label: "Alerts", icon: Bell },
-  { href: "/app/feed", label: "Settings", icon: Settings },
+  { href: "/app/library", label: "Library", icon: Library },
+  { href: "/app/alerts", label: "Alerts", icon: Bell },
+  { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -65,7 +65,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <nav className="mt-6 flex flex-1 flex-col gap-1">
           {nav.map((n) => {
-            const isActive = n.href === "/app/feed" ? pathname.startsWith("/app/feed") : pathname.startsWith(n.href);
+            const isActive = pathname.startsWith(n.href);
             return (
               <MotionLink
                 key={n.label}
