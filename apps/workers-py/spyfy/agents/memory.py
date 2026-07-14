@@ -19,7 +19,6 @@ import sqlite3
 import uuid
 from typing import Any, Callable, Sequence
 
-import numpy as np
 
 logging.getLogger(__name__).setLevel(logging.INFO)
 

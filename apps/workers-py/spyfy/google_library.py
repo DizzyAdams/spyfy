@@ -130,7 +130,7 @@ class GoogleAdsTransparency:
         country: str = "BR",
         timeout: float = 20.0,
         client: httpx.Client | None = None,
-        proxies: str | dict | None = None,
+        proxies: str | None = None,
     ) -> None:
         self.country = country
         self.timeout = timeout
@@ -144,7 +144,7 @@ class GoogleAdsTransparency:
                 headers=_HEADERS,
                 timeout=self.timeout,
                 follow_redirects=True,
-                proxies=self.proxies or None,
+                proxy=self.proxies or None,
             )
         return self._client
 

@@ -133,7 +133,7 @@ class TikTokAdLibrary:
         country: str = "BR",
         timeout: float = 20.0,
         client: httpx.Client | None = None,
-        proxies: str | dict | None = None,
+        proxies: str | None = None,
     ) -> None:
         self.access_token = access_token or ""
         self.country = country
@@ -148,7 +148,7 @@ class TikTokAdLibrary:
                 headers=_HEADERS,
                 timeout=self.timeout,
                 follow_redirects=True,
-                proxies=self.proxies or None,
+                proxy=self.proxies or None,
             )
         return self._client
 

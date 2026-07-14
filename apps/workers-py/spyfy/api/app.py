@@ -156,6 +156,29 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
                                 event.get("data", {})))
         return WebhookAck(ok=True)
 
+    @app.post("/v1/webhooks/inbound/{source}", response_model=WebhookAck)
+    async def generic_webhook(source: str, request: Request, token: str = Query(None)) -> WebhookAck:
+        """Webhook generico para receber dados de outros projetos sem HMAC."""
+        expected_token = os.getenv("INBOUND_WEBHOOK_TOKEN", "dev_token")
+        provided_token = token or request.headers.get("x-webhook-token", "")
+        if provided_token != expected_token:
+            raise HTTPException(401, "invalid token")
+        
+        try:
+            payload = await request.json()
+        except Exception:
+            raise HTTPException(400, "invalid json payload")
+            
+        event_id = payload.get("event_id", f"evt_{int(datetime.now().timestamp() * 1000)}")
+        event_type = payload.get("type", f"inbound.{source}")
+        event_data = payload.get("data", payload)
+        
+        if dedup.seen(event_id):
+            return WebhookAck(ok=True, dedup=True)
+            
+        bus.publish(DomainEvent(event_id, event_type, event_data))
+        return WebhookAck(ok=True)
+
     @app.post("/v1/agents/run")
     async def agent_run(req: AgentRunRequest) -> dict:
         """Dispara o grafo autônomo (LangGraph) de mineração -> enriquecimento.
