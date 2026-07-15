@@ -71,8 +71,11 @@ def add_real_ads(offers: list[dict[str, Any]]) -> int:
         for k in _MEDIA_FIELDS:
             v = o.get(k)
             rec[k] = v if isinstance(v, str) and v.strip() else ""
-        # `_source`/`_ts` são meta — não estão em _REAL_FIELDS.
-        rec["_source"] = "real_native"
+        # `_source`/`_ts` são meta — NÃO sobrescrevemos o source informado
+        # pelo extrator (ex.: "synthetic", "tiktok_creative_center",
+        # "browser_session") para o dashboard nunca mentir sobre a origem.
+        incoming = o.get("_source")
+        rec["_source"] = incoming if isinstance(incoming, str) and incoming else "real_native"
         rec["_ts"] = int(time.time())
         key = (rec.get("advertiser"), rec.get("headline"), rec.get("network"))
         if key in seen:
