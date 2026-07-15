@@ -220,6 +220,7 @@ def build_offer(niche: str, network: str, i: int) -> dict:
             {"type": "ty", "label": "Thank You", "stack": random.choice(["Kiwify", "Hotmart", "Stripe"])},
         ],
         "vslSeconds": vsl_min * 60 if vsl else 0,
+        "source": "synthetic",  # gerador estruturado (sem fonte nativa disponível)
     }
 
     # Enriquecimento de KPIs reais via motor de ROI/escala (igual às ofertas
@@ -330,8 +331,16 @@ def mine(niche: str, network: str, count: int = 1, simulate: bool = False,
          verdade quando há browser/sessão disponível (fonte REAL primária).
       2. Scrapers por API/web por rede (meta/tiktok/google/native) quando há
          token ou o web-scrape do site funciona.
-      3. Gerador estruturado (build_offer) — sempre entrega mídia+KPIs reais.
+      3. Gerador estruturado (build_offer, source="synthetic") — sempre
+         entrega mídia+KPIs; usado só quando nenhuma fonte nativa responde.
     """
+    import os
+    # Tokens oficiais das Ad Libraries (grátis) — injetados do ambiente
+    # (Coolify/Vercel env) quando disponíveis. Sem token, as libs caem no
+    # web-scrape (que pode esbarrar em login wall) e então no sintético.
+    meta_token = token or os.getenv("META_ACCESS_TOKEN", "")
+    tiktok_token = token or os.getenv("TIKTOK_ACCESS_TOKEN", "")
+
     if simulate:
         net = network if network in NETWORKS else random.choice(NETWORKS)
         offers = [build_offer(niche, net, i) for i in range(count)]
@@ -388,13 +397,13 @@ def mine(niche: str, network: str, count: int = 1, simulate: bool = False,
         if net == "meta":
             from .meta_library import MetaAdLibrary
 
-            found = MetaAdLibrary(access_token=token, country=country).search(
+            found = MetaAdLibrary(access_token=meta_token, country=country).search(
                 niche, limit=count
             )
         elif net == "tiktok":
             from .tiktok_library import TikTokAdLibrary
 
-            found = TikTokAdLibrary(access_token=token, country=country).search(
+            found = TikTokAdLibrary(access_token=tiktok_token, country=country).search(
                 niche, limit=count
             )
         elif net == "google":

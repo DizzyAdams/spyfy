@@ -70,6 +70,10 @@ def collect_once(
     Serverless-safe: sem loop infinito, sem bloquear. O Vercel Cron chama
     isso a cada N minutos para manter a loja de anúncios reais sempre
     atualizada (substituto dos "mini-bots sempre online").
+
+    Cada bot reporta quantos anúncios vieram de fonte NATIVA REAL
+    (source != "synthetic") vs. gerador estruturado (synthetic) — para o
+    dashboard nunca mentir sobre a origem dos dados.
     """
     from .real_ads_store import add_real_ads, count as _cnt
 
@@ -77,6 +81,8 @@ def collect_once(
     # Embaralha para não bater sempre na mesma ordem (distribui a carga).
     tasks = random.sample(tasks, len(tasks))
     total_added = 0
+    real_added = 0
+    synth_added = 0
     per_bot: list[dict[str, Any]] = []
     for niche, net in tasks:
         try:
@@ -88,6 +94,13 @@ def collect_once(
             reason = repr(e)
         else:
             reason = ""
+        # Contabiliza real vs sintético (origem honesta).
+        real_n = sum(
+            1 for o in (found or []) if o.get("source") not in ("synthetic", "", None)
+        )
+        synth_n = len(found or []) - real_n
+        real_added += min(real_n, added)
+        synth_added += max(0, added - real_n)
         total_added += added
         per_bot.append(
             {
@@ -95,6 +108,8 @@ def collect_once(
                 "network": net,
                 "scraped": len(found or []),
                 "added": added,
+                "real": real_n,
+                "synthetic": synth_n,
                 **({"reason": reason} if reason else {}),
             }
         )
@@ -102,6 +117,8 @@ def collect_once(
         "ok": True,
         "bots": len(tasks),
         "added": total_added,
+        "realAdded": real_added,
+        "syntheticAdded": synth_added,
         "realAdsTotal": _cnt(),
         "bots_detail": per_bot,
     }

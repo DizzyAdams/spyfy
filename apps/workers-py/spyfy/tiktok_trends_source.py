@@ -18,12 +18,15 @@ from spyfy.scrapling_adapter import ScraplingClient
 
 def _clean(txt: str) -> str:
     s = txt.strip()
+    # StealthyFetcher pode devolver o JSON como repr de bytes (b'...').
+    # Normaliza para a string JSON real antes de fazer json.loads.
     if s.startswith("b'") or s.startswith('b"'):
         try:
             import ast
-            s = ast.literal_eval(s)
-            if isinstance(s, bytes):
-                s = s.decode("utf-8", "replace")
+            dec = ast.literal_eval(s)
+            if isinstance(dec, bytes):
+                dec = dec.decode("utf-8", "replace")
+            s = dec
         except Exception:
             s = s[2:-1] if s.endswith(("'", '"')) else s[2:]
     for pre in [")]}while(1);", ")]}'", ")]}", "for (;;);"]:
@@ -33,23 +36,40 @@ def _clean(txt: str) -> str:
 
 
 def _extract_hashtags(state: dict) -> list[str]:
-    """Caminha o dehydratedState e coleta hashtags reais de tendência."""
-    found = []
+    """Caminha o dehydratedState e coleta hashtags reais de tendência.
 
-    def walk(o):
-        if isinstance(o, dict):
-            for k, v in o.items():
-                if k in ("hashtag", "tag", "hashtagName", "name") and isinstance(v, str) and v:
-                    if v not in found and not v.isupper():
-                        found.append(v)
-                walk(v)
-        elif isinstance(o, list):
-            for it in o:
-                walk(it)
-    walk(state)
-    # filtra só hashtags com '#' ou textuais curtas
-    out = [h for h in found if isinstance(h, str) and 1 < len(h) < 40][:50]
-    return out
+    Formato atual da TikTok Creative Center (confirmado ao vivo):
+    ``state.data.pages[0].data[]`` — cada item tem ``hashtagName``.
+    """
+    found: list[str] = []
+
+    # 1) Caminho direto pages[0].data[].hashtagName
+    pages = (state.get("pages") or []) if isinstance(state, dict) else []
+    for page in pages:
+        rows = (page.get("data") or []) if isinstance(page, dict) else []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            tag = row.get("hashtagName") or row.get("hashtag") or row.get("tag")
+            if isinstance(tag, str) and tag and 1 < len(tag) < 40:
+                if tag not in found:
+                    found.append(tag)
+
+    # 2) Fallback: varredura recursiva por chaves conhecidas
+    if not found:
+        def walk(o):
+            if isinstance(o, dict):
+                for k, v in o.items():
+                    if k in ("hashtag", "tag", "hashtagName", "name") and isinstance(v, str) and v:
+                        if v not in found and not v.isupper():
+                            found.append(v)
+                    walk(v)
+            elif isinstance(o, list):
+                for it in o:
+                    walk(it)
+        walk(state)
+
+    return [h for h in found if isinstance(h, str) and 1 < len(h) < 40][:50]
 
 
 def fetch_tiktok_trends(niche: str, country: str = "BR", period: int = 30,
@@ -69,7 +89,9 @@ def fetch_tiktok_trends(niche: str, country: str = "BR", period: int = 30,
             "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"),
         })
-        data = json.loads(_clean(resp.text or ""))
+        if resp.status_code != 200 or not resp.text:
+            return []
+        data = json.loads(_clean(resp.text))
     except Exception:
         return []
 

@@ -148,7 +148,15 @@ class ScraplingClient:
             fetch_kwargs["proxy"] = self.proxy
         try:
             page = StealthyFetcher.fetch(full_url, **fetch_kwargs)
-            html = page.body if isinstance(page.body, str) else str(page.body)
+            body = page.body
+            # StealthyFetcher may return bytes or str; normalize to str safely.
+            if isinstance(body, (bytes, bytearray)):
+                try:
+                    html = body.decode("utf-8")
+                except UnicodeDecodeError:
+                    html = body.decode("utf-8", "replace")
+            else:
+                html = body if isinstance(body, str) else str(body)
             return _ScraplingResponse(200, html or "", full_url)
         except Exception as exc:  # noqa: BLE001 - anti-bot / timeout / bloqueio
             return _ScraplingResponse(000, "", full_url, error=repr(exc))
