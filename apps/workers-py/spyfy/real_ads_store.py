@@ -53,6 +53,11 @@ def save_all(offers: list[dict[str, Any]]) -> None:
         json.dump(offers, f, ensure_ascii=False, indent=2)
 
 
+# Campos de mídia/destino — garantimos "" (nunca None) para o
+# frontend não renderizar `undefined`/mídia quebrada.
+_MEDIA_FIELDS = ("image", "videoUrl", "thumb", "format", "pageUrl", "link", "cta", "snapshotUrl")
+
+
 def add_real_ads(offers: list[dict[str, Any]]) -> int:
     """Normaliza e anexa anúncios nativos REAIS à loja. Retorna nº adicionado."""
     existing = load_all()
@@ -62,11 +67,16 @@ def add_real_ads(offers: list[dict[str, Any]]) -> int:
         rec = {k: o.get(k) for k in _REAL_FIELDS if o.get(k) not in (None, "")}
         if not rec.get("headline") and not rec.get("advertiser"):
             continue
+        # Normaliza mídia/destino para string ("" se ausente).
+        for k in _MEDIA_FIELDS:
+            v = o.get(k)
+            rec[k] = v if isinstance(v, str) and v.strip() else ""
+        # `_source`/`_ts` são meta — não estão em _REAL_FIELDS.
+        rec["_source"] = "real_native"
+        rec["_ts"] = int(time.time())
         key = (rec.get("advertiser"), rec.get("headline"), rec.get("network"))
         if key in seen:
             continue
-        rec["_source"] = "real_native"
-        rec["_ts"] = int(time.time())
         existing.append(rec)
         seen.add(key)
         added += 1
@@ -77,7 +87,12 @@ def add_real_ads(offers: list[dict[str, Any]]) -> int:
 
 def query(niche: str | None = None, network: str | None = None,
           country: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
-    """Filtra a loja por nicho/rede/país."""
+    """Filtra a loja por nicho/rede/país.
+
+    Garante que todo anúncio tenha `link` (destino real) não vazio:
+    deriva de `link` -> `pageUrl` -> `snapshotUrl`, senão "". Assim o
+    card "Ver oferta" sempre abre algo (ou "#" tratado no frontend).
+    """
     ads = load_all()
     if niche:
         nk = niche.lower()
@@ -86,6 +101,9 @@ def query(niche: str | None = None, network: str | None = None,
         ads = [a for a in ads if a.get("network") == network]
     if country:
         ads = [a for a in ads if (a.get("country") or "").upper() == country.upper()]
+    for a in ads:
+        if not a.get("link"):
+            a["link"] = a.get("pageUrl") or a.get("snapshotUrl") or ""
     return ads[:limit]
 
 

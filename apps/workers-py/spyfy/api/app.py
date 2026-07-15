@@ -418,19 +418,55 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
     def clone(req: CloneRequest) -> dict:
         """Clona uma LP/oferta (A11 Cloner).
 
-        Recebe ``offer_id`` (busca o offer simulado) ou ``url`` (fetch real
-        com fallback gracioso) e devolve um *clone bundle* estruturado +
-        HTML reconstruído pronto para exportar.
+        Recebe `offer_id` (oferta real coletada OU simulada) ou `url`
+        (fetch real com fallback gracioso) e devolve um *clone bundle*
+        estruturado + HTML reconstruído pronto para exportar.
+
+        CORREÇÃO: quando `offer_id` aponta para um anúncio REAL
+        (store de anúncios nativos), usamos o `link`/`pageUrl` real do
+        card como `url` do clone — assim o clone abre a LP de verdade,
+        não um offer simulado.
         """
         from ..clone import clone_offer
 
         offer = None
+        clone_url: str | None = req.url
         if req.offer_id:
-            offer = get_offer_by_id(req.offer_id, simulate=True)
+            # Resolve o offer pelo mesmo pipeline do feed (`discover_offers`),
+            # que atribui o `id` canônico `real_{net}_{niche}_{i}` / `ofr_...`.
+            # Assim o clone pega o LINK REAL do anúncio (não um offer simulado).
+            try:
+                from ..offers_service import discover_offers
+
+                found = discover_offers(
+                    niche=req.niche,
+                    network="all",
+                    country=req.country,
+                    limit=200,
+                    simulate=False,
+                )
+                real_hit = next(
+                    (a for a in found if a.get("id") == req.offer_id), None
+                )
+                if real_hit is not None:
+                    offer = real_hit
+                    clone_url = (
+                        real_hit.get("link")
+                        or real_hit.get("pageUrl")
+                        or real_hit.get("snapshotUrl")
+                        or clone_url
+                    )
+            except Exception:  # noqa: BLE001
+                pass
+            # Fallback: oferta simulada (mantém comportamento anterior).
             if offer is None:
-                raise HTTPException(404, "oferta não encontrada")
+                offer = get_offer_by_id(req.offer_id, simulate=True)
+                if offer is None:
+                    raise HTTPException(404, "oferta não encontrada")
         niche = req.niche or (offer or {}).get("niche")
-        return clone_offer(url=req.url, offer=offer, niche=niche, country=req.country)
+        return clone_offer(
+            url=clone_url, offer=offer, niche=niche, country=req.country
+        )
 
     @app.get("/v1/categories")
     def categories() -> dict:
