@@ -339,21 +339,64 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
             by_net[a.get("network", "meta")] = by_net.get(a.get("network", "meta"), 0) + 1
         return {"ok": True, "real_ads": count(), "byNetwork": by_net}
 
+    @app.post("/v1/radar/ingest")
+    async def radar_ingest(request: Request) -> dict:
+        """Ingestão em tempo real do Radar (realtime_producer / WebSocket).
+
+        Aceita:
+          { "offer": {...} }  |  { "offers": [ {...}, ... ] }  |  [ {...}, ... ]
+        Normaliza e grava na loja de anúncios REAIS (real_ads_store), que é a
+        fonte primária do feed (discover_offers com simulate=false). Retorna
+        sempre 200 (não quebra o pipeline realtime).
+        """
+        from ..real_ads_store import add_real_ads, count as _cnt
+
+        try:
+            payload = await request.json()
+        except Exception:
+            return {"ok": False, "added": 0, "reason": "JSON inválido"}
+
+        if isinstance(payload, list):
+            ads = payload
+        elif isinstance(payload, dict):
+            ads = payload.get("offers") or ([payload.get("offer")] if payload.get("offer") else [])
+        else:
+            ads = []
+        if isinstance(ads, list) and ads:
+            added = add_real_ads(ads)
+            return {"ok": True, "added": added, "source": "radar", "total_real": _cnt()}
+        return {"ok": False, "added": 0, "reason": "corpo vazio/inválido"}
+
 
     @app.get("/v1/cron/warm")
     def cron_warm() -> dict:
         """Aquecimento periódico do feed (Vercel Cron a cada 30min).
 
-        Re-minera as redes principais via discover_offers (fallback
-        estruturado offline-safe) para manter o feed sempre populado e
-        exercita a rota /v1/metrics. Não quebra se uma rede falhar.
+        - Re-minera as redes principais via discover_offers (fallback
+          estruturado offline-safe) para manter o feed sempre populado.
+        - Puxa a fonte REAL pública (TikTok Creative Center trends, sem
+          token/sessão) e grava na loja de anúncios reais, para que o feed
+          traga dados reais da Ad Library mesmo no serverless (onde o
+          Scrapling/browser não cabem). Não quebra se uma rede falhar.
         """
         try:
             for key in ("keto", "finance", "beauty", "marketing"):
                 discover_offers(niche=key, limit=12, simulate=True)
             # exercita agregação de métricas (offline-safe)
             compute_metrics(discover_offers(niche="finance", limit=24, simulate=True))
-            return {"ok": True, "warmed": True}
+
+            # Fonte REAL pública (sem token): TikTok Creative Center.
+            added_real = 0
+            try:
+                from ..tiktok_trends_source import fetch_tiktok_trends
+                real = fetch_tiktok_trends("trends", "BR")
+                if real:
+                    from ..real_ads_store import add_real_ads
+                    added_real = add_real_ads(real)
+            except Exception:  # noqa: BLE001
+                pass
+
+            return {"ok": True, "warmed": True, "addedRealTrends": added_real}
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "reason": repr(e)}
 

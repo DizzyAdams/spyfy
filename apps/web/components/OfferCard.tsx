@@ -14,6 +14,7 @@ import {
   Snowflake,
   CalendarDays,
   Gauge,
+  ExternalLink,
 } from "lucide-react";
 import { Offer, NETWORKS } from "@/lib/data";
 import { scoreBand, formatNumber, scaleIndex, spendBand, cn } from "@/lib/utils";

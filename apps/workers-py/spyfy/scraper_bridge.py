@@ -263,6 +263,64 @@ def _enrich_offer_kpis(offer: dict, econ: "NicheEconomics", longevity: int, impr
     )
 
 
+_SCRAPER_MEMORY = None
+
+
+def _is_placeholder(url: str | None) -> bool:
+    if not url:
+        return True
+    u = str(url).strip()
+    return u.startswith("/videos/") or u.startswith("/images/") or u in _LOCAL_VIDEOS
+
+
+def _process_with_rag(offers: list[dict]) -> list[dict]:
+    global _SCRAPER_MEMORY
+    try:
+        from .agents.memory import OfferMemory
+        if _SCRAPER_MEMORY is None:
+            _SCRAPER_MEMORY = OfferMemory(collection_name="scraper_bridge_offers")
+        
+        memory = _SCRAPER_MEMORY
+        for offer in offers:
+            hits = memory.find_similar(offer, threshold=0.8)
+            if hits:
+                for hit in hits:
+                    meta = hit.get("metadata", {})
+                    hit_video = meta.get("videoUrl", "")
+                    hit_image = meta.get("image", "")
+                    
+                    if hit_video and not _is_placeholder(hit_video) and _is_placeholder(offer.get("videoUrl")):
+                        offer["videoUrl"] = hit_video
+                    if hit_image and not _is_placeholder(hit_image) and _is_placeholder(offer.get("image")):
+                        offer["image"] = hit_image
+                        offer["thumb"] = hit_image
+            
+            memory.add_offers([offer])
+    except Exception as e:
+        print(f"[scraper_bridge] RAG/memory error: {e}", file=sys.stderr)
+    return offers
+
+
+def _read_cookie_str(cookies_path: str) -> str:
+    """Lê cache/cookies.json e devolve a string 'k=v; k2=v2' p/ sessão logada.
+
+    Aceita tanto o formato de lista do Playwright (list[dict{name,value}])
+    quanto um JSON de objeto {name: value}, ou texto bruto 'k=v; ...'.
+    """
+    try:
+        with open(cookies_path, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        # Fallback: lê como texto bruto.
+        with open(cookies_path, encoding="utf-8") as f:
+            return f.read().strip()
+    if isinstance(data, list):
+        return "; ".join(f"{c.get('name')}={c.get('value')}" for c in data if c.get("name"))
+    if isinstance(data, dict):
+        return "; ".join(f"{k}={v}" for k, v in data.items())
+    return ""
+
+
 def mine(niche: str, network: str, count: int = 1, simulate: bool = False,
           token: str = "", country: str = "BR") -> list[dict]:
     """Busca ofertas nativas/anúncios REAIS, com fallback em camadas.
@@ -276,17 +334,52 @@ def mine(niche: str, network: str, count: int = 1, simulate: bool = False,
     """
     if simulate:
         net = network if network in NETWORKS else random.choice(NETWORKS)
-        return [build_offer(niche, net, i) for i in range(count)]
+        offers = [build_offer(niche, net, i) for i in range(count)]
+        return _process_with_rag(offers)
 
     net = network if network in NETWORKS else random.choice(NETWORKS)
 
-    # 1) Fonte REAL primária: browser headless próprio (com proxy livre se setado).
+    # 1) Fonte REAL primária: browser headless próprio (com sessão se houver
+    #    cookies.json em cache/, ou token/token de API). O browser_scraper
+    #    injeta cookies.json automaticamente ao abrir a Ad Library, contornando
+    #    o login wall quando há sessão logada disponível.
     try:
-        from .browser_scraper import scrape_native_ads
+        from .browser_scraper import (
+            CACHE_DIR,
+            BrowserScrapeUnavailable,
+            scrape_native_ads,
+            scrape_native_ads_session,
+        )
+        cookies_path = os.path.join(CACHE_DIR, "cookies.json")
+        if os.path.exists(cookies_path):
+            # Sessão autenticada -> dados REAIS da Meta Ad Library (sem login wall).
+            try:
+                real = scrape_native_ads_session(niche, net, _read_cookie_str(cookies_path), country, count)
+                if real:
+                    offers = _finalize_mined(real, niche, net, count)
+                    return _process_with_rag(offers)
+            except BrowserScrapeUnavailable:
+                pass
         real = scrape_native_ads(niche, net, country, count)
         if real:
-            return _finalize_mined(real, niche, net, count)
+            offers = _finalize_mined(real, niche, net, count)
+            return _process_with_rag(offers)
+    except BrowserScrapeUnavailable:  # noqa: BLE001 - sem browser/sessão
+        pass
     except Exception:  # noqa: BLE001 - sem browser/sessão ou login wall
+        pass
+
+    # 2) Fonte REAL pública sem auth: TikTok Creative Center (tendências de criativos).
+    #    Endpoint cc_portal_api/api/trendsTcc é público (confirmado ao vivo) e não
+    #    exige token/login. Entrega dados REAIS da Ad Library do TikTok.
+    try:
+        from .tiktok_trends_source import fetch_tiktok_trends
+        if net == "tiktok":
+            real2 = fetch_tiktok_trends(niche, country, count)
+            if real2:
+                offers = _finalize_mined(real2, niche, net, count)
+                return _process_with_rag(offers)
+    except Exception:  # noqa: BLE001 - fonte indisponível
         pass
 
     # 2) Scrapers por rede (API/web).
@@ -313,12 +406,14 @@ def mine(niche: str, network: str, count: int = 1, simulate: bool = False,
 
             found = NativeAdsLibrary(country=country).search(niche, limit=count)
         if found:
-            return _finalize_mined(found, niche, net, count)
+            offers = _finalize_mined(found, niche, net, count)
+            return _process_with_rag(offers)
     except Exception:  # noqa: BLE001 - fallback explícito ao simulador
         pass
 
     # 3) Gerador estruturado (sempre funcional).
-    return [build_offer(niche, net, i) for i in range(count)]
+    offers = [build_offer(niche, net, i) for i in range(count)]
+    return _process_with_rag(offers)
 
 
 def _finalize_mined(found: list[dict], niche: str, net: str, count: int) -> list[dict]:

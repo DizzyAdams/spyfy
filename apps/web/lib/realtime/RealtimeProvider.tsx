@@ -23,7 +23,7 @@ import type {
 type ExtendedConnectionStatus = ConnectionStatus | "polling";
 
 const RT_URL = process.env.NEXT_PUBLIC_REALTIME_URL;
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://workers-py.vercel.app";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://spyfyv1prod.vercel.app";
 const PORT = process.env.NEXT_PUBLIC_REALTIME_PORT || "4000";
 const MAX_OFFERS = 240;
 const MAX_BACKOFF = 15_000;

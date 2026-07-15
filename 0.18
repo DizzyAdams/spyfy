@@ -1,0 +1,8 @@
+WARNING: Ignoring invalid distribution ~rotobuf (C:\Users\forrydev\AppData\Local\Programs\Python\Python312\Lib\site-packages)
+Collecting msgspec
+  Downloading msgspec-0.21.1-cp312-cp312-win_amd64.whl.metadata (5.9 kB)
+Downloading msgspec-0.21.1-cp312-cp312-win_amd64.whl (190 kB)
+WARNING: Ignoring invalid distribution ~rotobuf (C:\Users\forrydev\AppData\Local\Programs\Python\Python312\Lib\site-packages)
+Installing collected packages: msgspec
+WARNING: Ignoring invalid distribution ~rotobuf (C:\Users\forrydev\AppData\Local\Programs\Python\Python312\Lib\site-packages)
+Successfully installed msgspec-0.21.1

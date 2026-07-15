@@ -178,5 +178,16 @@
     "cta": "Quero Aprender",
     "_source": "real_native",
     "_ts": 1784064915
+  },
+  {
+    "headline": "Anúncio REAL teste",
+    "advertiser": "Loja X",
+    "network": "meta",
+    "niche": "keto",
+    "country": "BR",
+    "image": "https://picsum.photos/seed/x/640/384",
+    "format": "video",
+    "_source": "real_native",
+    "_ts": 1784092575
   }
 ]

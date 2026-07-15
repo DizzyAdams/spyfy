@@ -74,3 +74,25 @@ def test_doc_text_includes_key_fields():
     text = _doc_text(_offer("Headline X", advertiser="AnuncianteY"))
     assert "Headline X" in text
     assert "AnuncianteY" in text
+
+
+def test_query_performance_sub_millisecond():
+    import time
+    mem = OfferMemory()
+    offers = [
+        _offer(f"Headline de teste super legal {i}", niche=f"niche_{i%5}")
+        for i in range(500)
+    ]
+    mem.add_offers(offers)
+    # Warmup
+    mem.query("Headline de teste super legal 0")
+    
+    start = time.perf_counter()
+    iterations = 50
+    for _ in range(iterations):
+        mem.query("Headline de teste super legal 0")
+    end = time.perf_counter()
+    
+    avg_time_ms = ((end - start) / iterations) * 1000
+    assert avg_time_ms < 5.0, f"Average query time {avg_time_ms:.4f} ms exceeded 5.0 ms threshold"
+

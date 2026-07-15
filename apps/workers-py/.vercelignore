@@ -1,15 +1,57 @@
-# Vercel serverless build uses the LEAN dependency set in requirements.txt
+# Force Vercel's Python builder to use the LEAN requirements.txt
 # (FastAPI/Uvicorn/Pydantic/Httpx/Tenacity/Apprise) so the function stays
-# under the Python serverless size limit. The full dependency set
-# (chromadb/langgraph/langchain/playwright/torch via pyproject.toml + uv.lock)
-# is only for local dev and the Docker/Render container build, NOT for Vercel.
-# Excluding these forces @vercel/python to fall back to requirements.txt.
+# under the serverless size limit. The heavy set (chromadb/langgraph/
+# langchain/playwright/torch) lives in pyproject.toml + uv.lock and is only
+# for local dev / Docker / Render — NOT for Vercel.
 uv.lock
 pyproject.toml
 
-# Local dev / debugging artifacts — never deploy these.
-.venv_lean/
+# Python / build cruft — these are HUGE locally (torch/chromadb venvs, caches)
+# and must never be uploaded or they blow the 225 MB function limit.
+.venv
 .venv/
+.venv_win
+.venv_win/
+venv
+venv/
+env
+env/
+__pycache__
+__pycache__/
+*.pyc
+.pytest_cache
+.pytest_cache/
+.mypy_cache
+.mypy_cache/
+.ruff_cache
+.ruff_cache/
+.cache
+.cache/
+.vercel
+.vercel/
+.vercel/output
+.vercel/output/
+.idea
+.idea/
+.vscode
+.vscode/
+.DS_Store
 *.log
 _qip.py
-.vercel/output/
+_deploy.log
+
+# Local dev / debugging / docs — never deploy these.
+# NOTE: do NOT use "_*.py" here — it would also exclude __init__.py (namespace
+# package bug -> "cannot import name '__version__'"). Only exclude temp scripts.
+tests
+tests/
+scripts
+scripts/
+examples
+examples/
+docs
+docs/
+*.md
+cache_*
+node_modules
+node_modules/

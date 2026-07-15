@@ -1,0 +1,28 @@
+WARNING: Ignoring invalid distribution ~rotobuf (C:\Users\forrydev\AppData\Local\Programs\Python\Python312\Lib\site-packages)
+Collecting scrapling
+  Using cached scrapling-0.4.11-py3-none-any.whl.metadata (35 kB)
+Collecting lxml>=6.1.1 (from scrapling)
+  Downloading lxml-6.1.1-cp312-cp312-win_amd64.whl.metadata (3.6 kB)
+Requirement already satisfied: cssselect>=1.4.0 in C:\Users\forrydev\AppData\Local\Programs\Python\Python312\Lib\site-packages (from scrapling) (1.4.0)
+Requirement already satisfied: orjson>=3.11.8 in C:\Users\forrydev\AppData\Local\Programs\Python\Python312\Lib\site-packages (from scrapling) (3.11.9)
+Requirement already satisfied: tld>=0.13.2 in C:\Users\forrydev\AppData\Local\Programs\Python\Python312\Lib\site-packages (from scrapling) (0.13.2)
+Collecting w3lib>=2.4.1 (from scrapling)
+  Using cached w3lib-2.4.1-py3-none-any.whl.metadata (2.3 kB)
+Requirement already satisfied: typing_extensions in C:\Users\forrydev\AppData\Local\Programs\Python\Python312\Lib\site-packages (from scrapling) (4.15.0)
+Using cached scrapling-0.4.11-py3-none-any.whl (163 kB)
+Downloading lxml-6.1.1-cp312-cp312-win_amd64.whl (4.0 MB)
+   ---------------------------------------- 4.0/4.0 MB 10.9 MB/s  0:00:00
+Using cached w3lib-2.4.1-py3-none-any.whl (21 kB)
+WARNING: Ignoring invalid distribution ~rotobuf (C:\Users\forrydev\AppData\Local\Programs\Python\Python312\Lib\site-packages)
+Installing collected packages: w3lib, lxml, scrapling
+  Attempting uninstall: lxml
+    Found existing installation: lxml 5.4.0
+    Uninstalling lxml-5.4.0:
+      Successfully uninstalled lxml-5.4.0
+
+ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+crawl4ai 0.9.0 requires lxml~=5.3, but you have lxml 6.1.1 which is incompatible.
+htmldate 1.10.0 requires python-dateutil>=2.9.0.post0, but you have python-dateutil 2.9.0 which is incompatible.
+vulnclaw 0.3.2 requires typer>=0.12.0, but you have typer 0.9.4 which is incompatible.
+WARNING: Ignoring invalid distribution ~rotobuf (C:\Users\forrydev\AppData\Local\Programs\Python\Python312\Lib\site-packages)
+Successfully installed lxml-6.1.1 scrapling-0.4.11 w3lib-2.4.1

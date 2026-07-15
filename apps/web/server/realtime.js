@@ -311,15 +311,53 @@ const VALID_NETWORKS = new Set(NETWORKS);
 
 function normalizeOffer(raw) {
   const o = raw && typeof raw === "object" ? raw : {};
+  const id =
+    typeof o.id === "string" && o.id
+      ? o.id
+      : `ext_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+  const format = ["video", "image", "carousel"].includes(o.format) ? o.format : "video";
+
+  // Real media URLs or mock generators if absent
+  let image = typeof o.image === "string" && o.image ? o.image : undefined;
+  let thumb = typeof o.thumb === "string" && o.thumb ? o.thumb : undefined;
+  if (!image) {
+    if (thumb) {
+      image = thumb;
+    } else {
+      image = `https://picsum.photos/seed/${id}/640/384`;
+    }
+  }
+  if (!thumb) {
+    thumb = image;
+  }
+
+  const VIDEOS = [
+    "/videos/fitness.mp4",
+    "/videos/finance.mp4",
+    "/videos/fashion.mp4",
+    "/videos/tech.mp4",
+  ];
+  let videoUrl = typeof o.videoUrl === "string" && o.videoUrl ? o.videoUrl : (typeof o.video === "string" && o.video ? o.video : undefined);
+  if (!videoUrl && format === "video") {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash += id.charCodeAt(i);
+    }
+    videoUrl = VIDEOS[hash % VIDEOS.length];
+  }
+
+  const ctaUrl = typeof o.ctaUrl === "string" && o.ctaUrl ? o.ctaUrl : 
+                 (typeof o.cta_url === "string" && o.cta_url ? o.cta_url : 
+                 (typeof o.landing_page_url === "string" && o.landing_page_url ? o.landing_page_url : 
+                 (typeof o.landingPageUrl === "string" && o.landingPageUrl ? o.landingPageUrl : 
+                 (typeof o.link_url === "string" && o.link_url ? o.link_url : undefined))));
+
   return {
-    id:
-      typeof o.id === "string" && o.id
-        ? o.id
-        : `ext_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+    id,
     headline: String(o.headline || o.title || "Oferta sem título"),
     advertiser: String(o.advertiser || o.advertiser_name || "Anunciante"),
     network: VALID_NETWORKS.has(o.network) ? o.network : "meta",
-    format: ["video", "image", "carousel"].includes(o.format) ? o.format : "video",
+    format,
     niche: String(o.niche || "Geral"),
     longevityDays: Math.max(0, Math.round(num(o.longevityDays ?? o.longevity_days, 1))),
     winningScore: Math.min(
@@ -335,9 +373,10 @@ function normalizeOffer(raw) {
         : pick(GRADIENTS),
     bullets: Array.isArray(o.bullets) ? o.bullets.map(String) : [],
     cta: String(o.cta || "Ver oferta"),
-    image: typeof o.image === "string" ? o.image : undefined,
-    thumb: typeof o.thumb === "string" ? o.thumb : undefined,
-    videoUrl: typeof o.videoUrl === "string" ? o.videoUrl : (typeof o.video === "string" ? o.video : undefined),
+    image,
+    thumb,
+    videoUrl,
+    ctaUrl,
     funnel:
       Array.isArray(o.funnel) && o.funnel.length
         ? o.funnel.map((f) => ({

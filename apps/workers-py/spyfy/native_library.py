@@ -41,6 +41,7 @@ from .realtime_producer import (
     looks_like_video,
     video_cover,
 )
+from .scrapling_adapter import SCRAPLING_AVAILABLE, ScraplingClient
 
 # Showcase público de native ads usado como fonte de web-scrape por padrão.
 # Pode ser sobrescrito por ``base_url`` (ex.: um portal interno de transparência).
@@ -169,14 +170,21 @@ class NativeAdsLibrary:
         self.proxies = proxies
 
     @property
-    def client(self) -> httpx.Client:
+    def client(self) -> httpx.Client | "ScraplingClient":
         if self._client is None:
-            self._client = httpx.Client(
-                headers=_HEADERS,
-                timeout=self.timeout,
-                follow_redirects=True,
-                proxy=self.proxies or None,
-            )
+            # TRANSPORTE REAL: Scrapling StealthyFetcher (anti-bot Native).
+            # Fallback para httpx.Client caso o Scrapling não esteja instalado.
+            if SCRAPLING_AVAILABLE:
+                self._client = ScraplingClient(
+                    country=self.country, timeout=self.timeout, proxy=self.proxies
+                )
+            else:
+                self._client = httpx.Client(
+                    headers=_HEADERS,
+                    timeout=self.timeout,
+                    follow_redirects=True,
+                    proxy=self.proxies or None,
+                )
         return self._client
 
     def search(
@@ -296,12 +304,17 @@ class NativeAdsLibrary:
             or d.get("url")
             or d.get("adUrl")
             or "",
-            image=d.get("landingPageUrl")
-            or d.get("imageUrl")
+            image=d.get("imageUrl")
             or d.get("image")
+            or d.get("thumbnailUrl")
+            or d.get("thumbnail")
+            or d.get("landingPageUrl")
             or d.get("url")
             or "",
-            video="",
+            video=d.get("videoUrl")
+            or d.get("video_url")
+            or d.get("video")
+            or "",
         )
 
 
@@ -440,12 +453,17 @@ class NativeAdsLibrary:
             or d.get("url")
             or d.get("adUrl")
             or "",
-            image=d.get("landingPageUrl")
-            or d.get("imageUrl")
+            image=d.get("imageUrl")
             or d.get("image")
+            or d.get("thumbnailUrl")
+            or d.get("thumbnail")
+            or d.get("landingPageUrl")
             or d.get("url")
             or "",
-            video="",
+            video=d.get("videoUrl")
+            or d.get("video_url")
+            or d.get("video")
+            or "",
         )
 
     def _finalize(

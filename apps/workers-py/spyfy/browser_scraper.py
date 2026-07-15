@@ -86,20 +86,80 @@ def _fetch_html(browser, url: str, timeout: int = 25000) -> str:
 # ----------------------------------------------------------------------------
 
 def _parse_meta(html: str, niche: str, limit: int) -> list[dict]:
+    """Extrai cards da Meta Ad Library (HTML). Tolerante a múltiplos formatos.
+
+    Cubre o máximo possível de forma tolerante; o parse real de cards só é
+    completo com sessão (ver _parse_meta_dom / scrape_native_ads_session).
+    """
     import re
-    advertisers = re.findall(r'"advertiser_name":"([^"]+)"', html)
-    headlines = re.findall(r'"body":"([^"]{8,200})"', html)
-    imgs = re.findall(r'https://[^"\']+\.(?:jpg|png|webp)', html)
+    advertisers = re.findall(r'"(?:advertiser_name|page_name|pageName)"\s*:\s*"([^"]+)"', html)
+    headlines = re.findall(r'"(?:body|primary_text|snapshot_body)"\s*:\s*"([^"]{8,200})"', html)
+    media = re.findall(r'https://[^"\'\s]+?\.(?:mp4|jpg|png|webp)(?:\?[^"\'\s]*)?', html)
+    media = [m for m in media if ("fbcdn" in m or "fbsbx" in m or "facebook" in m)][:limit * 2] or media[:limit * 2]
     out = []
     n = max(len(advertisers), len(headlines), 1)
     for i in range(min(limit, n)):
+        url = media[i] if i < len(media) else ""
+        is_video = url.endswith(".mp4")
         out.append({
             "id": f"meta_{niche}_{int(time.time())}_{i}",
             "headline": headlines[i] if i < len(headlines) else f"{niche.title()} — anúncio patrocinado",
             "advertiser": advertisers[i] if i < len(advertisers) else "Anunciante",
-            "network": "meta", "niche": niche, "format": "video",
-            "image": imgs[i] if i < len(imgs) else "",
-            "videoUrl": "",
+            "network": "meta", "niche": niche, "format": "video" if is_video else "image",
+            "image": url if not is_video else "",
+            "videoUrl": url if is_video else "",
+        })
+    return out
+
+
+def _parse_meta_dom(page, niche: str, limit: int) -> list[dict]:
+    """Extrai cards da Meta Ad Library pelo DOM (sessão logada apenas).
+
+    A Ad Library logada expõe cada anúncio num container estável. Coletamos
+    advertiser, texto, imagem/vídeo e faixa de impressões. Retorna [] se não
+    houver cards (login wall / sessão expirada).
+    """
+    import re
+    cards = page.query_selector_all('[data-testid="ad-library-card"], div[role="article"]')
+    out = []
+    for i, card in enumerate(cards[:limit]):
+        try:
+            text = (card.inner_text() or "").strip()
+        except Exception:
+            text = ""
+        adv = ""
+        try:
+            for a in card.query_selector_all("a[href*='/']"):
+                t = (a.inner_text() or "").strip()
+                if t and len(t) > 2:
+                    adv = t
+                    break
+        except Exception:
+            pass
+        img = ""
+        vid = ""
+        try:
+            v = card.query_selector("video")
+            if v:
+                vid = v.get_attribute("src") or ""
+            if not vid:
+                im = card.query_selector("img")
+                if im:
+                    img = im.get_attribute("src") or ""
+        except Exception:
+            pass
+        imp = ""
+        m = re.search(r'([\d.,]+\s*[KMB]?)\s*[-–]\s*[\d.,]+\s*[KMB]?\s*impress', text, re.I)
+        if not m:
+            m = re.search(r'([\d.,]+\s*[KMB]?)\s*impress', text, re.I)
+        if m:
+            imp = m.group(0)
+        out.append({
+            "id": f"meta_{niche}_{int(time.time())}_{i}",
+            "headline": text[:200] or f"{niche.title()} — anúncio patrocinado",
+            "advertiser": adv or "Anunciante",
+            "network": "meta", "niche": niche, "format": "video" if vid else "image",
+            "image": img, "videoUrl": vid, "estImpressionsText": imp,
         })
     return out
 
@@ -246,12 +306,19 @@ def scrape_native_ads_session(niche: str, network: str, cookie: str,
         page.goto(url, wait_until="domcontentloaded", timeout=30000)
         page.wait_for_timeout(6000)
         html = page.content()
-        page.close()
-        ctx.close()
-        parser = _PARSERS.get(network, lambda h, n, l: _parse_generic(h, n, network, l))
-        offers = parser(html, niche, limit)
+        # Tenta extração via DOM (cards reais da Ad Library logada); se não
+        # houver cards (sessão expirada/login wall), cai no parser de HTML.
+        offers = []
+        if network == "meta":
+            try:
+                offers = _parse_meta_dom(page, niche, limit)
+            except Exception:  # noqa: BLE001
+                offers = []
         if not offers:
-            raise BrowserScrapeUnavailable("0 cards reais (cookie inválido?)")
+            parser = _PARSERS.get(network, lambda h, n, l: _parse_generic(h, n, network, l))
+            offers = parser(html, niche, limit)
+        if not offers:
+            raise BrowserScrapeUnavailable("0 cards reais (cookie inválido/sessão expirada?)")
         for o in offers:
             o["_source"] = "browser_session"
         _write_cache(niche, network, offers)

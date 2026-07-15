@@ -18,6 +18,7 @@ import re
 import sqlite3
 import uuid
 from typing import Any, Callable, Sequence
+import numpy as np
 
 
 logging.getLogger(__name__).setLevel(logging.INFO)
@@ -87,6 +88,10 @@ def _meta(offer: dict[str, Any]) -> dict[str, Any]:
         "advertiser": offer.get("advertiser") or "",
         "winning_score": float(offer.get("winningScore") or 0.0),
         "headline": offer.get("headline", ""),
+        "image": offer.get("image") or "",
+        "thumb": offer.get("thumb") or "",
+        "videoUrl": offer.get("videoUrl") or "",
+        "format": offer.get("format") or "",
     }
 
 
@@ -124,6 +129,8 @@ class OfferMemory:
         self._docs: list[str] = []
         self._embeds: list[list[float]] = []
         self._metas: list[dict[str, Any]] = []
+        self._embeds_np: np.ndarray | None = None
+        self._norms_np: np.ndarray | None = None
         # SQLite para persistência de docs/metas (opcional)
         self._db: sqlite3.Connection | None = None
         if persist_dir:
@@ -142,6 +149,8 @@ class OfferMemory:
         rows = self._db.execute(
             "SELECT id, doc, meta FROM offers"
         ).fetchall()
+        self._embeds_np = None
+        self._norms_np = None
         for oid, doc, meta_json in rows:
             import json
 
@@ -155,6 +164,8 @@ class OfferMemory:
         """Insere/atualiza ofertas (idempotente por id). Retorna nº gravado."""
         if not offers:
             return 0
+        self._embeds_np = None
+        self._norms_np = None
         for o in offers:
             oid = o.get("id") or o.get("offer_id") or str(uuid.uuid4())
             text = _doc_text(o)
@@ -189,19 +200,33 @@ class OfferMemory:
         if not self._ids:
             return []
         q = self._embedding([text])[0]
+        q_arr = np.array(q, dtype=np.float32)
+        q_norm = np.linalg.norm(q_arr)
+
+        if self._embeds_np is None or len(self._embeds_np) != len(self._embeds):
+            self._embeds_np = np.array(self._embeds, dtype=np.float32)
+            self._norms_np = np.linalg.norm(self._embeds_np, axis=1)
+
+        dots = np.dot(self._embeds_np, q_arr)
+        denom = self._norms_np * q_norm
+
+        sims = np.zeros_like(dots)
+        valid = denom > 0
+        sims[valid] = dots[valid] / denom[valid]
+
         out: list[dict[str, Any]] = []
         for i, oid in enumerate(self._ids):
-            sim = float(round(_cosine(q, self._embeds[i]), 4))
             if where:
                 m = self._metas[i]
                 if not all(m.get(k) == v for k, v in where.items()):
                     continue
+            sim = float(round(sims[i], 4))
             out.append(
                 {
                     "offer_id": oid,
                     "document": self._docs[i],
                     "metadata": self._metas[i],
-                    "distance": float(round(1 - sim, 4)),
+                    "distance": float(round(1.0 - sim, 4)),
                     "similarity": sim,
                 }
             )

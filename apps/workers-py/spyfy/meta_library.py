@@ -31,6 +31,7 @@ from .realtime_producer import (
     looks_like_video,
     video_cover,
 )
+from .scrapling_adapter import SCRAPLING_AVAILABLE, ScraplingClient
 
 AD_LIBRARY_WEB = "https://www.facebook.com/ads/library/"
 AD_ARCHIVE_API = "https://graph.facebook.com/v19.0/ads_archive"
@@ -127,6 +128,39 @@ def _bullets_from_body(body: str, n: int = 3) -> list[str]:
     return out[:n] if out else [body[:120]]
 
 
+def _find_cdn_urls(node: Any) -> tuple[str, str]:
+    """Recursively walks node to find the best image and video CDN URLs."""
+    img_candidates = []
+    vid_candidates = []
+
+    def walk(curr: Any):
+        if isinstance(curr, str):
+            if looks_like_video(curr):
+                vid_candidates.append(curr)
+            elif looks_like_image(curr):
+                img_candidates.append(curr)
+        elif isinstance(curr, dict):
+            # Prefer checking direct keys first to keep quality high
+            for key in ("video_url", "videoUrl", "videoPlayUrl", "video_play_url", "video"):
+                if key in curr and isinstance(curr[key], str) and looks_like_video(curr[key]):
+                    vid_candidates.insert(0, curr[key])
+            for key in ("image_url", "imageUrl", "thumbnail_url", "thumbnailUrl", "url", "image", "thumbnail"):
+                if key in curr and isinstance(curr[key], str) and looks_like_image(curr[key]):
+                    img_candidates.insert(0, curr[key])
+            
+            for v in curr.values():
+                walk(v)
+        elif isinstance(curr, list):
+            for v in curr:
+                walk(v)
+
+    walk(node)
+    
+    best_img = img_candidates[0] if img_candidates else ""
+    best_vid = vid_candidates[0] if vid_candidates else ""
+    return best_img, best_vid
+
+
 class MetaAdLibrary:
     """Cliente de busca de anúncios do Meta Ad Library (API ou web)."""
 
@@ -146,14 +180,21 @@ class MetaAdLibrary:
         self.proxies = proxies
 
     @property
-    def client(self) -> httpx.Client:
+    def client(self) -> httpx.Client | "ScraplingClient":
         if self._client is None:
-            self._client = httpx.Client(
-                headers=_HEADERS,
-                timeout=self.timeout,
-                follow_redirects=True,
-                proxy=self.proxies or None,
-            )
+            # TRANSPORTE REAL: Scrapling StealthyFetcher (anti-bot nativo Meta).
+            # Fallback para httpx.Client caso o Scrapling não esteja instalado.
+            if SCRAPLING_AVAILABLE:
+                self._client = ScraplingClient(
+                    country=self.country, timeout=self.timeout, proxy=self.proxies
+                )
+            else:
+                self._client = httpx.Client(
+                    headers=_HEADERS,
+                    timeout=self.timeout,
+                    follow_redirects=True,
+                    proxy=self.proxies or None,
+                )
         return self._client
 
     def search(
@@ -325,6 +366,12 @@ class MetaAdLibrary:
                 except (json.JSONDecodeError, ValueError):
                     decoded = raw
                 node[key] = html.unescape(decoded)
+        for url_match in re.findall(r'https?://[^\s"\'\\<>]+', window):
+            url_cleaned = url_match.replace("\\/", "/")
+            if looks_like_video(url_cleaned) and "videoUrl" not in node:
+                node["videoUrl"] = url_cleaned
+            elif looks_like_image(url_cleaned) and "imageUrl" not in node:
+                node["imageUrl"] = url_cleaned
         return node
 
 
@@ -392,7 +439,7 @@ class MetaAdLibrary:
     def _web_node_to_offer(self, d: dict[str, Any]) -> dict | None:
         if not isinstance(d, dict):
             return None
-        aid = str(d.get("adArchiveId") or d.get("ad_archive_id") or "")
+        aid = str(d.get("adArchiveId") or d.get("ad_archive_id") or d.get("id") or "")
         if not aid:
             return None
         page = d.get("pageName") or d.get("page_name") or "Anunciante"
@@ -420,6 +467,9 @@ class MetaAdLibrary:
             or snapshot
             or ""
         )
+        real_image, real_video = _find_cdn_urls(d)
+        image = real_image if real_image else snapshot
+        video = real_video if real_video else ("" if fmt != "video" else snapshot)
         return self._finalize(
             uid=aid,
             headline=headline,
@@ -431,8 +481,8 @@ class MetaAdLibrary:
             impr=impr,
             snapshot=snapshot,
             link=link,
-            image=snapshot,
-            video="" if fmt != "video" else snapshot,
+            image=image,
+            video=video,
         )
 
     def _finalize(

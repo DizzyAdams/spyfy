@@ -18,3 +18,10 @@ langgraph>=0.2
 # do grafo de agentes (Reviver.__init__ got unexpected keyword 'allowed_objects').
 langchain-core>=1.4.7,<2
 langchain>=0.3
+# --- Scrapling: fetch REAL das Ad Libraries (Meta/TikTok/Google/Native) --------
+scrapling>=0.4.11
+curl-cffi>=0.7
+browserforge>=0.5
+patchright>=1.48
+msgspec>=0.18
+playwright>=1.48

@@ -3,6 +3,7 @@
   "functions": {
     "api/index.py": { "maxDuration": 60 }
   },
+  "installCommand": "pip install -r requirements.txt",
   "crons": [
     { "path": "/v1/cron/warm", "schedule": "*/30 * * * *" }
   ]

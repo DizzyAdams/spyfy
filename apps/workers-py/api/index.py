@@ -1,8 +1,9 @@
 """Vercel FastAPI entrypoint (default location: api/index.py).
 
-Exposes a top-level ``app`` (FastAPI instance) so Vercel's FastAPI detector
-picks it up automatically. The frontend calls this deployment's URL via
-NEXT_PUBLIC_API_URL — no local machine or tunnel required.
+Exposes a top-level ``app`` (FastAPI instance) AND a ``handler`` (Mangum
+wrapper) so Vercel's Python runtime can invoke the ASGI app. The frontend
+calls this deployment's URL via NEXT_PUBLIC_API_URL — no local machine or
+tunnel required.
 """
 import os
 import sys
@@ -14,3 +15,9 @@ if ROOT not in sys.path:
 from spyfy.api.app import create_app  # noqa: E402
 
 app = create_app()
+
+# Mangum adapta o ASGI app do FastAPI para o runtime serverless da Vercel.
+# Sem isso, a função falha com FUNCTION_INVOCATION_FAILED.
+from mangum import Mangum  # noqa: E402
+
+handler = Mangum(app, lifespan="off")
