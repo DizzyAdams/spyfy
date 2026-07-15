@@ -13,6 +13,7 @@ RUN pip install -r requirements.txt
 
 # código
 COPY spyfy ./spyfy
+COPY run_fleet.py ./run_fleet.py
 
 # usuário não-root (segurança)
 RUN useradd -m -u 10001 spyfy && chown -R spyfy:spyfy /app
