@@ -216,6 +216,9 @@ def _build_html(bundle: dict[str, Any]) -> str:
     )
     stack = "".join(f"<span class=\"tag\">{html.escape(s)}</span>" for s in bundle.get("detected_stack", [])) or "<i>nao detectado</i>"
     cta = html.escape((bundle.get("ctas") or [{}])[0].get("text", "Quero saber mais"))
+    # CTA do clone aponta para a LP/oferta REAL (bundle["url"]) em vez de "#".
+    # Assim o clone exportado leva o usuário para o anúncio de verdade.
+    cta_href = html.escape(bundle.get("url") or "#")
     imgs = "".join(
         f'<img src="{html.escape(i)}" alt="criativo" style="max-width:100%;border-radius:12px;margin:8px 0"/>'
         for i in bundle.get("images", [])[:6]
@@ -243,12 +246,14 @@ def _build_html(bundle: dict[str, Any]) -> str:
  {imgs}
  <div class="card"><h3>Funil mapeado</h3><ul>{steps}</ul></div>
  <div class="card"><h3>Stack detectado</h3><div>{stack}</div></div>
- <a class="cta" href="#">{cta}</a>
+ <a class="cta" href="{cta_href}" target="_blank" rel="noopener">{cta}</a>
  <p class="note">Clone gerado pelo SpyFy (estudo/referencia). ID: {html.escape(bundle.get('clone_id',''))}</p>
 </div></body></html>"""
 
 
-def _fallback_clone(offer: dict[str, Any] | None, niche: str | None, clone_id: str) -> dict[str, Any]:
+def _fallback_clone(
+    offer: dict[str, Any] | None, niche: str | None, clone_id: str, url: str | None = None
+) -> dict[str, Any]:
     o = offer or {}
     headline = o.get("headline") or "Oferta em alta no seu nicho"
     bullets = o.get("bullets") or ["Angulo comprovado de escala", "Funil detectado automaticamente"]
@@ -275,6 +280,7 @@ def _fallback_clone(offer: dict[str, Any] | None, niche: str | None, clone_id: s
         "offer_id": o.get("id"),
         "niche": o.get("niche") or niche,
         "network": o.get("network"),
+        "url": url,
         "exported_at": datetime.now(timezone.utc).isoformat(),
     }
     bundle["html"] = _build_html(bundle)
@@ -319,11 +325,10 @@ def clone_offer(
             bundle["html"] = _build_html(bundle)
             return bundle
         except Exception as e:  # noqa: BLE001 - fallback explicito
-            fb = _fallback_clone(offer, niche, clone_id)
-            fb["url"] = url
+            fb = _fallback_clone(offer, niche, clone_id, url=url)
             fb["reason"] = f"fetch falhou ({type(e).__name__}) — fallback p/ template"
             return fb
-    return _fallback_clone(offer, niche, clone_id)
+    return _fallback_clone(offer, niche, clone_id, url=url)
 
 
 __all__ = ["clone_offer", "detect_stack", "detect_funnel"]

@@ -48,6 +48,25 @@ services:
       timeout: 5s
       retries: 3
 
+  # Frota de mini-bots de extração nativa REAL (24/7). Reaproveita a imagem
+  # `api` (já traz scrapling/playwright em requirements.docker.txt) e roda o
+  # daemon run_fleet.py em loop infinito. No serverless (Vercel) o mesmo
+  # trabalho é feito pelo Cron /v1/cron/collect-ads; aqui no Docker/Coolify
+  # ele é contínuo e grava direto na loja de anúncios reais (cache/real_ads.json).
+  fleet:
+    build: ./apps/workers-py
+    command: ["python", "run_fleet.py", "--rounds", "0", "--interval", "300"]
+    environment:
+      - FLEET_INTERVAL=${FLEET_INTERVAL:-300}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # persiste a loja de anúncios reais entre reinícios do container
+      - fleet_cache:/app/cache
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+
   # Proxy com basic auth a frente do web (protege exposicao publica via tunnel)
   caddy:
     image: caddy:2-alpine
@@ -82,3 +101,7 @@ services:
     depends_on:
       - caddy
     profiles: ["tunnel"]
+
+volumes:
+  fleet_cache:
+    driver: local

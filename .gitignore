@@ -56,3 +56,7 @@ start_spyfy.bat
 vercel_deploy.out
 verify_prod.py
 200
+
+# SpyFy: testes/scratch locais do agente e loja de anuncios volatil (cache)
+apps/workers-py/_verify_clone.py
+apps/workers-py/cache/

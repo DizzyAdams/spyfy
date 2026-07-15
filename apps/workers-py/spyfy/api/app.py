@@ -400,6 +400,24 @@ def create_app(dispatcher: NotificationDispatcher | None = None) -> FastAPI:
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "reason": repr(e)}
 
+    @app.get("/v1/cron/collect-ads")
+    def cron_collect_ads() -> dict:
+        """Frota de mini-bots de extração nativa REAL (Vercel Cron).
+
+        Roda UMA rodada da frota (``spyfy.ad_fleet.collect_once``) que varre
+        a grade (nicho, rede) fazendo fetch real das Ad Libraries nativas e
+        grava na loja de anúncios reais. É o substituto serverless-safe dos
+        "mini-bots sempre online": o Cron dispara isso a cada N minutos,
+        mantendo a loja sempre fresca sem precisar de processo persistente.
+        Não quebra se uma rede cair (cada bot é isolado).
+        """
+        try:
+            from ..ad_fleet import collect_once
+
+            return collect_once(count=3, country="BR")
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "reason": repr(e)}
+
     @app.get("/v1/metrics")
     def metrics(
         niche: str | None = Query(default=None),
