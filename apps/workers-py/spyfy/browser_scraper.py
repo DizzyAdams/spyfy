@@ -188,6 +188,9 @@ def _parse_generic(html: str, niche: str, network: str, limit: int) -> list[dict
 
 _PARSERS: dict[str, Callable[[str, str, int], list[dict]]] = {
     "meta": _parse_meta,
+    "google": lambda h, n, l: _parse_generic(h, n, "google", l),
+    "tiktok": lambda h, n, l: _parse_generic(h, n, "tiktok", l),
+    "native": lambda h, n, l: _parse_generic(h, n, "native", l),
 }
 
 _URLS = {
