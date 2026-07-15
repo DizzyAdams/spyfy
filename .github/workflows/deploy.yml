@@ -1,0 +1,83 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+
+jobs:
+  web:
+    name: Deploy web (spyfyprod)
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+      - name: Pull Vercel env (web)
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+        working-directory: apps/web
+      - name: Build
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+        working-directory: apps/web
+      - name: Deploy
+        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN" --yes
+        working-directory: apps/web
+      - name: Health check
+        run: |
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://spyfyprod.vercel.app/ || echo 000)
+            if [ "$code" = "200" ]; then echo "web OK ($code)"; exit 0; fi
+            echo "wait ($code)..."; sleep 6
+          done
+          echo "web health check FAILED"; exit 1
+
+  workers:
+    name: Deploy workers (spyfyv1prod)
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_WORKERS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+      - name: Pull Vercel env (workers)
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+        working-directory: apps/workers-py
+      - name: Deploy lean (requirements only)
+        run: vercel deploy --prod --yes --archive=tgz --token="$VERCEL_TOKEN"
+        working-directory: apps/workers-py
+      - name: Health check
+        run: |
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://spyfyv1prod.vercel.app/docs || echo 000)
+            if [ "$code" = "200" ]; then echo "workers OK ($code)"; exit 0; fi
+            echo "wait ($code)..."; sleep 6
+          done
+          echo "workers health check FAILED"; exit 1
+
+  summary:
+    name: Deploy summary
+    needs: [web, workers]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "## SpyFy deploy finished" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Web:  https://spyfyprod.vercel.app" >> "$GITHUB_STEP_SUMMARY"
+          echo "- API:  https://spyfyv1prod.vercel.app/docs" >> "$GITHUB_STEP_SUMMARY"
